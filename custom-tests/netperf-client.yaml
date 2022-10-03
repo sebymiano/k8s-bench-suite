@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: netperf-client
+  name: netperf-client
+spec:
+  containers:
+  - name: netperf
+    image: networkstatic/netperf
+    args:
+    - /bin/sh
+    - -c
+    - sleep 30000
+  # nodeSelector:
+  #   kubernetes.io/hostname: $CLIENT_NODE
+  restartPolicy: Never
