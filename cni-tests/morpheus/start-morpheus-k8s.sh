@@ -53,7 +53,7 @@ sed -i -E "s/(apiServerIp:\s*)\".*\"/\1\"${API_SERVER_HOST}\"/" manifests/${CONF
 sed -i -E "s/(apiServerPort:\s*)\".*\"/\1\"${API_SERVER_PORT}\"/" manifests/${CONFIG_MAP_FILE}
 
 sed -i -E "s/(enableMorpheusDynamicOpts:\s*)\".*\"/\1\"true\"/" manifests/${CONFIG_MAP_FILE}
-sed -i -E "s/(morpheusLogLevel:\s*)\".*\"/\1\"OFF\"/" manifests/${CONFIG_MAP_FILE}
+sed -i -E "s/(morpheusLogLevel:\s*)\".*\"/\1\"INFO\"/" manifests/${CONFIG_MAP_FILE}
 
 kubectl apply -f manifests
 popd
