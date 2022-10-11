@@ -61,3 +61,6 @@ sleep 90
 
 echo -e "${COLOR_GREEN}[ INFO ] Install custom resources ${COLOR_OFF}"
 kubectl create -f ${DIR}/custom-resources.yaml
+
+echo -e "${COLOR_GREEN}[ INFO ] Restart all containers ${COLOR_OFF}"
+kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTNETWORK:.spec.hostNetwork --no-headers=true | grep '<none>' | awk '{print "-n "$1" "$2}' | xargs -L 1 -r kubectl delete pod
