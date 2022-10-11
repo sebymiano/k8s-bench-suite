@@ -34,6 +34,7 @@ while getopts :dh option; do
  esac
 done
 
+set -e
 echo -e "${COLOR_GREEN}[ INFO ] Start Polykube CNI ${COLOR_OFF}"
 pushd .
 
@@ -48,11 +49,11 @@ API_SERVER_ADDR=$(kubectl -n kube-system get pod -l component=kube-apiserver -o=
 
 IFS=: read -r API_SERVER_HOST API_SERVER_PORT <<< ${API_SERVER_ADDR}
 
-sed -i -E "s/(apiServerIp:\s*)\".*\"/\1\"${API_SERVER_HOST}\"/" ${CONFIG_MAP_FILE}
-sed -i -E "s/(apiServerPort:\s*)\".*\"/\1"${API_SERVER_PORT}"/" ${CONFIG_MAP_FILE}
+sed -i -E "s/(apiServerIp:\s*)\".*\"/\1\"${API_SERVER_HOST}\"/" manifests/${CONFIG_MAP_FILE}
+sed -i -E "s/(apiServerPort:\s*)\".*\"/\1"${API_SERVER_PORT}"/" manifests/${CONFIG_MAP_FILE}
 
-sed -i -E "s/(enableMorpheusDynamicOpts:\s*)\".*\"/\1\"false\"/" ${CONFIG_MAP_FILE}
-sed -i -E "s/(morpheusLogLevel:\s*)\".*\"/\1\"OFF\"/" ${CONFIG_MAP_FILE}
+sed -i -E "s/(enableMorpheusDynamicOpts:\s*)\".*\"/\1\"false\"/" manifests/${CONFIG_MAP_FILE}
+sed -i -E "s/(morpheusLogLevel:\s*)\".*\"/\1\"OFF\"/" manifests/${CONFIG_MAP_FILE}
 
 kubectl apply -f manifests
 popd
