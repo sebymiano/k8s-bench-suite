@@ -34,7 +34,7 @@ rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
 cilium status --wait
 
 while true; do
-    read -p "Do you want to start the connectivity test? It takes ~5 mins (y or n).s" yn
+    read -p "Do you want to start the connectivity test? It takes ~5 mins (y or n)." yn
     case $yn in
         [Yy]* ) break;;
         [Nn]* ) exit;;

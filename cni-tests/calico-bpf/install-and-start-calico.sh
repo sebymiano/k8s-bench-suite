@@ -1,0 +1,41 @@
+#!/bin/bash
+
+COLOR_RED='\033[0;31m'
+COLOR_GREEN='\033[0;32m'
+COLOR_YELLOW='\033[0;33m'
+COLOR_OFF='\033[0m' # No Color
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+echo -e "${COLOR_YELLOW}[ INFO ] Before starting make sure you have created the cluster with kube-proxy disabled ${COLOR_OFF}"
+echo -e "${COLOR_YELLOW}[ INFO ] Command: sudo kubeadm init --skip-phases=addon/kube-proxy ${COLOR_OFF}"
+
+while true; do
+    read -p "Have you done it? (y or n)." yn
+    case $yn in
+        [Yy]* ) break;;
+        [Nn]* ) exit;;
+        * ) echo "Please answer yes or no.";;
+    esac
+done
+
+API_SERVER_ADDR=$(kubectl -n kube-system get pod -l component=kube-apiserver -o=jsonpath="{.items[0].metadata.annotations.kubeadm\.kubernetes\.io/kube-apiserver\.advertise-address\.endpoint}")
+
+IFS=: read -r API_SERVER_HOST API_SERVER_PORT <<< ${API_SERVER_ADDR}
+
+kubectl apply -f - <<EOF
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: kubernetes-services-endpoint
+  namespace: tigera-operator
+data:
+  KUBERNETES_SERVICE_HOST: "${API_SERVER_HOST}"
+  KUBERNETES_SERVICE_PORT: "${API_SERVER_PORT}"
+EOF
+
+echo -e "${COLOR_GREEN}[ INFO ] Install Tigera operator ${COLOR_OFF}"
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml
+
+echo -e "${COLOR_GREEN}[ INFO ] Install custom resources ${COLOR_OFF}"
+kubectl create -f ${DIR}/custom-resources.yaml
