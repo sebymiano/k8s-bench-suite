@@ -40,6 +40,9 @@ API_SERVER_ADDR=$(kubectl -n kube-system get pod -l component=kube-apiserver -o=
 
 IFS=: read -r API_SERVER_HOST API_SERVER_PORT <<< ${API_SERVER_ADDR}
 
+echo -e "${COLOR_GREEN}[ INFO ] Install Tigera operator ${COLOR_OFF}"
+kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml
+
 echo -e "${COLOR_GREEN}[ INFO ] Apply config map with ${API_SERVER_ADDR} ${COLOR_OFF}"
 kubectl apply -f - <<EOF
 kind: ConfigMap
@@ -51,9 +54,10 @@ data:
   KUBERNETES_SERVICE_HOST: "${API_SERVER_HOST}"
   KUBERNETES_SERVICE_PORT: "${API_SERVER_PORT}"
 EOF
+kubectl delete pod -n tigera-operator -l k8s-app=tigera-operator
 
-echo -e "${COLOR_GREEN}[ INFO ] Install Tigera operator ${COLOR_OFF}"
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml
+sleep 90
+
 
 echo -e "${COLOR_GREEN}[ INFO ] Install custom resources ${COLOR_OFF}"
 kubectl create -f ${DIR}/custom-resources.yaml
