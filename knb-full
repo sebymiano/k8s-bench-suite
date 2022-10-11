@@ -285,6 +285,7 @@ function run-client {
 	fi
 
 	if [ "$ZERO_COPY" = "true" ]; then
+		$DEBUG && debug "Enable zero copy in iperf3"
 		ZERO_COPY_FLAG="-Z"
 	else
 		ZERO_COPY_FLAG=""
