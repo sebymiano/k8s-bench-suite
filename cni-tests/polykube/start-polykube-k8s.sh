@@ -59,7 +59,12 @@ kubectl apply -f manifests
 popd
 
 echo -e "${COLOR_GREEN}[ INFO ] Polykube CNI started, wait until all service boot up.${COLOR_OFF}"
-sleep 90
+secs=$((90))
+while [ $secs -gt 0 ]; do
+   echo -ne "$secs\033[0K\r"
+   sleep 1
+   : $((secs--))
+done
 
 echo -e "${COLOR_GREEN}[ INFO ] Restart all containers ${COLOR_OFF}"
 kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTNETWORK:.spec.hostNetwork --no-headers=true | grep '<none>' | awk '{print "-n "$1" "$2}' | xargs -L 1 -r kubectl delete pod
