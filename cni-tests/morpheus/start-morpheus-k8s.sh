@@ -61,7 +61,7 @@ popd
 echo -e "${COLOR_GREEN}[ INFO ] Morpheus CNI started, wait until all service boot up.${COLOR_OFF}"
 secs=$((90))
 while [ $secs -gt 0 ]; do
-   echo -ne "$secs\033[0K\r"
+   echo -ne "Countdown: $secs\033[0K\r"
    sleep 1
    : $((secs--))
 done
