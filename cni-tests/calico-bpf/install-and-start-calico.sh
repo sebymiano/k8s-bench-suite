@@ -7,11 +7,28 @@ COLOR_OFF='\033[0m' # No Color
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+function disable_kube_proxy {
+  set -x
+  kubectl patch ds -n kube-system kube-proxy -p '{"spec":{"template":{"spec":{"nodeSelector":{"non-calico": "true"}}}}}'
+  set +x
+}
+
 echo -e "${COLOR_YELLOW}[ INFO ] Before starting make sure you have created the cluster with kube-proxy disabled ${COLOR_OFF}"
 echo -e "${COLOR_YELLOW}[ INFO ] Command: sudo kubeadm init --skip-phases=addon/kube-proxy ${COLOR_OFF}"
 
+echo -e "${COLOR_YELLOW}[ INFO ] If you don't want to re-create the cluster, I can disable kube-proxy for you ${COLOR_OFF}"
+
 while true; do
-    read -p "Have you done it? (y or n)." yn
+    read -p "Do you want to do it? (y or n)." yn
+    case $yn in
+        [Yy]* ) disable_kube_proxy; break;;
+        [Nn]* ) break;;
+        * ) echo "Please answer yes or no.";;
+    esac
+done
+
+while true; do
+    read -p "Do you want to continue? (y or n)." yn
     case $yn in
         [Yy]* ) break;;
         [Nn]* ) exit;;
@@ -23,6 +40,7 @@ API_SERVER_ADDR=$(kubectl -n kube-system get pod -l component=kube-apiserver -o=
 
 IFS=: read -r API_SERVER_HOST API_SERVER_PORT <<< ${API_SERVER_ADDR}
 
+echo -e "${COLOR_GREEN}[ INFO ] Apply config map with ${API_SERVER_ADDR} ${COLOR_OFF}"
 kubectl apply -f - <<EOF
 kind: ConfigMap
 apiVersion: v1
