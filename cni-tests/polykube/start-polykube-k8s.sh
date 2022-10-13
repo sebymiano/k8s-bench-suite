@@ -59,7 +59,7 @@ kubectl apply -f manifests
 popd
 
 echo -e "${COLOR_GREEN}[ INFO ] Polykube CNI started, wait until all service boot up.${COLOR_OFF}"
-kubectl wait --for=condition=Ready nodes --all --timeout=90s
+kubectl wait --for=condition=Ready nodes --all --timeout=180s
 # secs=$((90))
 # while [ $secs -gt 0 ]; do
 #    echo -ne "Countdown: $secs\033[0K\r"
