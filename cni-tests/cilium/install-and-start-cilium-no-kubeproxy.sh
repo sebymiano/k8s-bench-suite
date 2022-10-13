@@ -40,7 +40,7 @@ echo -e "${COLOR_GREEN}[ INFO ] Cilium CNI installed. Wait until all services bo
 kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
 echo -e "${COLOR_GREEN}[ INFO ] Restart all containers ${COLOR_OFF}"
-kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTNETWORK:.spec.hostNetwork --no-headers=true | grep '<none>' | awk '{print "-n "$1" "$2}' | xargs -L 1 -r kubectl delete pod
+kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTNETWORK:.spec.hostNetwork --no-headers=true | grep '<none>' | awk '{print "-n "$1" "$2}' | xargs -L 1 -r kubectl delete pod --grace-period=15
 
 echo -e "${COLOR_GREEN}[ INFO ] Installing Cilium CLI ${COLOR_OFF}"
 CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/master/stable.txt)
