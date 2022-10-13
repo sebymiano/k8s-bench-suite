@@ -1,5 +1,5 @@
-Dockerbuild/*
-Dockerbuildclient/*
+Dockerbuild
+Dockerbuildclient
 nptests
 netperf-w?.yaml
 *.csv
@@ -11,4 +11,4 @@ netperf-w?.yaml
 *.pyc
 .vscode
 data-*
-
+launch

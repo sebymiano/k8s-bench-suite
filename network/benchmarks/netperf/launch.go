@@ -52,13 +52,15 @@ const (
 )
 
 var (
-	iterations     int
-	hostnetworking bool
-	tag            string
-	kubeConfig     string
-	testNamespace  string
-	netperfImage   string
-	cleanupOnly    bool
+	iterations      int
+	hostnetworking  bool
+	tag             string
+	kubeConfig      string
+	testNamespace   string
+	netperfImage    string
+	primaryNodeID   int
+	secondaryNodeID int
+	cleanupOnly     bool
 
 	everythingSelector metav1.ListOptions = metav1.ListOptions{}
 
@@ -79,10 +81,12 @@ func init() {
 	defaultKubeConfig := fmt.Sprintf("%s/.kube/config", os.Getenv("HOME"))
 	flag.StringVar(&kubeConfig, "kubeConfig", defaultKubeConfig,
 		"Location of the kube configuration file ($HOME/.kube/config")
+	flag.IntVar(&primaryNodeID, "node1", 0, "ID of the primary node")
+	flag.IntVar(&secondaryNodeID, "node2", 1, "ID of the secondary node")
 	flag.BoolVar(&cleanupOnly, "cleanup", false,
 		"(boolean) Run the cleanup resources phase only (use this flag to clean up orphaned resources from a test run)")
 	flag.IntVar(&testFrom, "testFrom", 0, "start from test number testFrom")
-	flag.IntVar(&testTo, "testTo", 13, "end at test number testTo")
+	flag.IntVar(&testTo, "testTo", 18, "end at test number testTo")
 }
 
 func setupClient() *kubernetes.Clientset {
@@ -467,8 +471,19 @@ func main() {
 		fmt.Println("Insufficient number of nodes for test (need minimum 2 nodes)")
 		return
 	}
-	primaryNode = nodes.Items[0]
-	secondaryNode = nodes.Items[1]
+
+	if len(nodes.Items) < primaryNodeID || len(nodes.Items) < secondaryNodeID {
+		fmt.Println("Wrong values for primary or secondary node IDs")
+		return
+	}
+
+	if primaryNodeID == secondaryNodeID {
+		fmt.Println("Primary node ID should be different then Secondary node ID")
+		return
+	}
+
+	primaryNode = nodes.Items[primaryNodeID]
+	secondaryNode = nodes.Items[secondaryNodeID]
 	fmt.Printf("Selected primary,secondary nodes = (%s, %s)\n", primaryNode.GetName(), secondaryNode.GetName())
 	executeTests(c)
 	cleanup(c)
