@@ -29,7 +29,7 @@ IFS=: read -r API_SERVER_HOST API_SERVER_PORT <<< ${API_SERVER_ADDR}
 
 set -x
 helm repo add cilium https://helm.cilium.io/
-helm install cilium cilium/cilium --version 1.12.3 \
+helm install cilium cilium/cilium --version 1.12.2 \
     --namespace kube-system \
     --set kubeProxyReplacement=strict \
     --set k8sServiceHost=${API_SERVER_HOST} \
