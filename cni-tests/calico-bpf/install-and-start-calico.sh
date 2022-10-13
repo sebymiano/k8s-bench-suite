@@ -56,7 +56,8 @@ data:
 EOF
 kubectl delete pod -n tigera-operator -l k8s-app=tigera-operator
 
-sleep 90
+echo -e "${COLOR_GREEN}[ INFO ] Calico CNI installed. Wait until all services boot up ${COLOR_OFF}"
+kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
 
 echo -e "${COLOR_GREEN}[ INFO ] Install custom resources ${COLOR_OFF}"

@@ -36,8 +36,8 @@ helm install cilium cilium/cilium --version 1.12.2 \
     --set k8sServicePort=${API_SERVER_PORT}
 
 set +x
-echo -e "${COLOR_GREEN}[ INFO ] Cilium CNI installed. Wait 30s ${COLOR_OFF}"
-sleep 30
+echo -e "${COLOR_GREEN}[ INFO ] Cilium CNI installed. Wait until all services boot up ${COLOR_OFF}"
+kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
 echo -e "${COLOR_GREEN}[ INFO ] Restart all containers ${COLOR_OFF}"
 kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTNETWORK:.spec.hostNetwork --no-headers=true | grep '<none>' | awk '{print "-n "$1" "$2}' | xargs -L 1 -r kubectl delete pod
