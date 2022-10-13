@@ -30,7 +30,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	api "k8s.io/api/core/v1"
@@ -485,6 +487,14 @@ func main() {
 	primaryNode = nodes.Items[primaryNodeID]
 	secondaryNode = nodes.Items[secondaryNodeID]
 	fmt.Printf("Selected primary,secondary nodes = (%s, %s)\n", primaryNode.GetName(), secondaryNode.GetName())
+	channel := make(chan os.Signal, 1)
+	signal.Notify(channel, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-channel
+		cleanup(c)
+		os.Exit(1)
+	}()
+
 	executeTests(c)
 	cleanup(c)
 }
