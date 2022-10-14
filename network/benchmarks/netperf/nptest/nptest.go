@@ -85,6 +85,7 @@ const (
 	parallelStreams      = "8"
 	rpcServicePort       = "5202"
 	localhostIPv4Address = "127.0.0.1"
+	iperf3AutoParams     = -1
 )
 
 const (
@@ -308,9 +309,15 @@ func allocateWorkToClient(workerState *workerState, workItem *WorkItem) {
 			workItem.ClientItem.Port = "5201"
 			workItem.ClientItem.MSS = v.MSS
 
-			v.MSS = v.MSS + mssStepSize
-			if v.MSS > mssMax {
+			if v.MSS == iperf3AutoParams {
 				v.Finished = true
+			} else {
+				v.MSS = v.MSS + mssStepSize
+				if v.MSS > mssMax {
+					// Perform last test, using the iperf3 default parameters
+					v.MSS = iperf3AutoParams
+					// v.Finished = true
+				}
 			}
 			return
 		case v.Type == qperfTCPTest:
@@ -720,7 +727,13 @@ func netperfServer() {
 func iperfClient(serverHost, serverPort string, mss int, workItemType int) (rv string) {
 	switch {
 	case workItemType == iperfTCPTest:
-		output, success := cmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-V", "-N", "-i", "30", "-t", "10", "-f", "m", "-w", "512M", "-Z", "-P", parallelStreams, "-M", strconv.Itoa(mss)}, 15)
+		var output string
+		var success bool
+		if mss == iperf3AutoParams {
+			output, success = cmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-V", "-N", "-i", "30", "-t", "10", "-f", "m", "-Z", "-P", parallelStreams}, 15)
+		} else {
+			output, success = cmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-V", "-N", "-i", "30", "-t", "10", "-f", "m", "-w", "512M", "-Z", "-P", parallelStreams, "-M", strconv.Itoa(mss)}, 15)
+		}
 		if success {
 			rv = output
 		}
