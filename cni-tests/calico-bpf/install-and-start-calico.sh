@@ -40,6 +40,11 @@ API_SERVER_ADDR=$(kubectl -n kube-system get pod -l component=kube-apiserver -o=
 
 IFS=: read -r API_SERVER_HOST API_SERVER_PORT <<< ${API_SERVER_ADDR}
 
+# kubectl delete --all daemonsets,replicasets,services,deployments,pods,rc,ingress,customresourcedefinitions --namespace=calico-system --grace-period=15
+# kubectl delete --all daemonsets,replicasets,services,deployments,pods,rc,ingress,customresourcedefinitions --namespace=tigera-operator --grace-period=15
+
+# sleep 15
+
 echo -e "${COLOR_GREEN}[ INFO ] Install Tigera operator ${COLOR_OFF}"
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.24.1/manifests/tigera-operator.yaml
 
@@ -54,14 +59,14 @@ data:
   KUBERNETES_SERVICE_HOST: "${API_SERVER_HOST}"
   KUBERNETES_SERVICE_PORT: "${API_SERVER_PORT}"
 EOF
-kubectl delete pod -n tigera-operator -l k8s-app=tigera-operator
-
-echo -e "${COLOR_GREEN}[ INFO ] Calico CNI installed. Wait until all services boot up ${COLOR_OFF}"
-kubectl wait --for=condition=Ready nodes --all --timeout=180s
-
 
 echo -e "${COLOR_GREEN}[ INFO ] Install custom resources ${COLOR_OFF}"
 kubectl create -f ${DIR}/custom-resources.yaml
+
+kubectl taint nodes --all node-role.kubernetes.io/control-plane- node-role.kubernetes.io/master-
+
+echo -e "${COLOR_GREEN}[ INFO ] Calico CNI installed. Wait until all services boot up ${COLOR_OFF}"
+kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
 echo -e "${COLOR_GREEN}[ INFO ] Restart all containers ${COLOR_OFF}"
 kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTNETWORK:.spec.hostNetwork --no-headers=true | grep '<none>' | awk '{print "-n "$1" "$2}' | xargs -L 1 -r kubectl delete pod --grace-period=15

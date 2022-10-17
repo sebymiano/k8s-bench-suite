@@ -15,6 +15,9 @@ spec:
       encapsulation: VXLANCrossSubnet
       natOutgoing: Enabled
       nodeSelector: all()
+  controlPlaneTolerations:
+    - key: "node-role.kubernetes.io/control-plane"
+      effect: NoSchedule
 
 ---
 

@@ -18,13 +18,13 @@ echo "$usage"
 echo
 }
 
-while getopts :dh option; do
+while getopts d:h option; do
  case "${option}" in
  h|\?)
   show_help
   exit 0
   ;;
- r) POLYKUBE_FOLDER=${OPTARG}
+ d) POLYKUBE_FOLDER=${OPTARG}
 	;;
  :)
   echo "Option -$OPTARG requires an argument." >&2
