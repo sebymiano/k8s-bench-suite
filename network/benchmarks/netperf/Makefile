@@ -28,8 +28,8 @@ push: docker
 	gcloud docker push $(DOCKERREPO)
 
 clean:
-	@rm -f Dockerbuild/*
-	@rm -f ./nptests ./*svg ./*png ./*jpg ./*csv ./*.cap ./*.pyc nptests ./*~
+	@rm -rf Dockerbuild
+	@rm -rf ./nptests ./*svg ./*png ./*jpg ./*csv ./*.cap ./*.pyc nptests ./*~
 	@go clean
 	cd nptest; make clean
 

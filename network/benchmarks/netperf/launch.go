@@ -221,12 +221,6 @@ func createServices(c *kubernetes.Clientset) bool {
 					TargetPort: intstr.FromInt(qperf19765),
 				},
 				{
-					Name:       "netperf-w2-sctp",
-					Protocol:   api.ProtocolSCTP,
-					Port:       iperf3Port,
-					TargetPort: intstr.FromInt(iperf3Port),
-				},
-				{
 					Name:       "netperf-w2-udp",
 					Protocol:   api.ProtocolUDP,
 					Port:       iperf3Port,

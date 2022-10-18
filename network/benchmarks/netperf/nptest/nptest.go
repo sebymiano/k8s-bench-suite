@@ -305,8 +305,7 @@ func allocateWorkToClient(workerState *workerState, workItem *WorkItem) {
 		if !v.ClusterIP {
 			workItem.ClientItem.Host = getWorkerPodIP(v.DestinationNode)
 		} else {
-			// workItem.ClientItem.Host = os.Getenv("NETPERF_W2_SERVICE_HOST")
-			workItem.ClientItem.Host = "netperf-w2"
+			workItem.ClientItem.Host = os.Getenv("NETPERF_W2_SERVICE_HOST")
 		}
 
 		fmt.Printf("workItem.ClientItem.Host: '%s'\n", workItem.ClientItem.Host)
