@@ -54,6 +54,8 @@ var worker string
 var kubenode string
 var podname string
 var testFrom, testTo int
+var msgSizeMinParam int
+var mssSizeMinParam int
 
 var workerStateMap map[string]*workerState
 
@@ -166,20 +168,22 @@ func init() {
 	flag.StringVar(&host, "host", "", "IP address to bind to (defaults to 0.0.0.0)")
 	flag.IntVar(&testFrom, "testFrom", 0, "start from test number testFrom")
 	flag.IntVar(&testTo, "testTo", 5, "end at test number testTo")
+	flag.IntVar(&msgSizeMinParam, "msgSizeMin", msgSizeMin, "minimum message size")
+	flag.IntVar(&mssSizeMinParam, "mssSizeMin", mssMin, "minimum MSS size")
 
 	workerStateMap = make(map[string]*workerState)
 	testcases = []*testcase{
-		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "1 qperf TCP. Same VM using Pod IP", Type: qperfTCPTest, ClusterIP: false, MsgSize: msgSizeMin},
-		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "2 qperf TCP. Same VM using Virtual IP", Type: qperfTCPTest, ClusterIP: true, MsgSize: msgSizeMin},
-		{SourceNode: "netperf-w1", DestinationNode: "netperf-w3", Label: "3 qperf TCP. Remote VM using Pod IP", Type: qperfTCPTest, ClusterIP: false, MsgSize: msgSizeMin},
-		{SourceNode: "netperf-w3", DestinationNode: "netperf-w2", Label: "4 qperf TCP. Remote VM using Virtual IP", Type: qperfTCPTest, ClusterIP: true, MsgSize: msgSizeMin},
-		{SourceNode: "netperf-w2", DestinationNode: "netperf-w2", Label: "5 qperf TCP. Hairpin Pod to own Virtual IP", Type: qperfTCPTest, ClusterIP: true, MsgSize: msgSizeMin},
+		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "1 qperf TCP. Same VM using Pod IP", Type: qperfTCPTest, ClusterIP: false, MsgSize: msgSizeMinParam},
+		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "2 qperf TCP. Same VM using Virtual IP", Type: qperfTCPTest, ClusterIP: true, MsgSize: msgSizeMinParam},
+		{SourceNode: "netperf-w1", DestinationNode: "netperf-w3", Label: "3 qperf TCP. Remote VM using Pod IP", Type: qperfTCPTest, ClusterIP: false, MsgSize: msgSizeMinParam},
+		{SourceNode: "netperf-w3", DestinationNode: "netperf-w2", Label: "4 qperf TCP. Remote VM using Virtual IP", Type: qperfTCPTest, ClusterIP: true, MsgSize: msgSizeMinParam},
+		{SourceNode: "netperf-w2", DestinationNode: "netperf-w2", Label: "5 qperf TCP. Hairpin Pod to own Virtual IP", Type: qperfTCPTest, ClusterIP: true, MsgSize: msgSizeMinParam},
 
-		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "6 iperf TCP. Same VM using Pod IP", Type: iperfTCPTest, ClusterIP: false, MSS: mssMin},
-		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "7 iperf TCP. Same VM using Virtual IP", Type: iperfTCPTest, ClusterIP: true, MSS: mssMin},
-		{SourceNode: "netperf-w1", DestinationNode: "netperf-w3", Label: "8 iperf TCP. Remote VM using Pod IP", Type: iperfTCPTest, ClusterIP: false, MSS: mssMin},
-		{SourceNode: "netperf-w3", DestinationNode: "netperf-w2", Label: "9 iperf TCP. Remote VM using Virtual IP", Type: iperfTCPTest, ClusterIP: true, MSS: mssMin},
-		{SourceNode: "netperf-w2", DestinationNode: "netperf-w2", Label: "10 iperf TCP. Hairpin Pod to own Virtual IP", Type: iperfTCPTest, ClusterIP: true, MSS: mssMin},
+		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "6 iperf TCP. Same VM using Pod IP", Type: iperfTCPTest, ClusterIP: false, MSS: mssSizeMinParam},
+		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "7 iperf TCP. Same VM using Virtual IP", Type: iperfTCPTest, ClusterIP: true, MSS: mssSizeMinParam},
+		{SourceNode: "netperf-w1", DestinationNode: "netperf-w3", Label: "8 iperf TCP. Remote VM using Pod IP", Type: iperfTCPTest, ClusterIP: false, MSS: mssSizeMinParam},
+		{SourceNode: "netperf-w3", DestinationNode: "netperf-w2", Label: "9 iperf TCP. Remote VM using Virtual IP", Type: iperfTCPTest, ClusterIP: true, MSS: mssSizeMinParam},
+		{SourceNode: "netperf-w2", DestinationNode: "netperf-w2", Label: "10 iperf TCP. Hairpin Pod to own Virtual IP", Type: iperfTCPTest, ClusterIP: true, MSS: mssSizeMinParam},
 
 		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "11 iperf UDP. Same VM using Pod IP", Type: iperfUDPTest, ClusterIP: false, MSS: mssMax},
 		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "12 iperf UDP. Same VM using Virtual IP", Type: iperfUDPTest, ClusterIP: true, MSS: mssMax},
@@ -301,8 +305,11 @@ func allocateWorkToClient(workerState *workerState, workItem *WorkItem) {
 		if !v.ClusterIP {
 			workItem.ClientItem.Host = getWorkerPodIP(v.DestinationNode)
 		} else {
-			workItem.ClientItem.Host = os.Getenv("NETPERF_W2_SERVICE_HOST")
+			// workItem.ClientItem.Host = os.Getenv("NETPERF_W2_SERVICE_HOST")
+			workItem.ClientItem.Host = "netperf-w2"
 		}
+
+		fmt.Printf("workItem.ClientItem.Host: '%s'\n", workItem.ClientItem.Host)
 
 		switch {
 		case v.Type == iperfTCPTest || v.Type == iperfUDPTest || v.Type == iperfSctpTest:
