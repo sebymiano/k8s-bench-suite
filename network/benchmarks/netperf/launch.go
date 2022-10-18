@@ -89,7 +89,7 @@ func init() {
 	flag.BoolVar(&cleanupOnly, "cleanup", false,
 		"(boolean) Run the cleanup resources phase only (use this flag to clean up orphaned resources from a test run)")
 	flag.IntVar(&testFrom, "testFrom", 0, "start from test number testFrom")
-	flag.IntVar(&testTo, "testTo", 18, "end at test number testTo")
+	flag.IntVar(&testTo, "testTo", 16, "end at test number testTo")
 	flag.IntVar(&msgSizeMin, "msgSizeMin", 1, "minimum message size")
 	flag.IntVar(&mssSizeMin, "mssSizeMin", 96, "minimum MSS size")
 }
