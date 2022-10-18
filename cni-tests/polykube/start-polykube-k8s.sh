@@ -51,6 +51,8 @@ IFS=: read -r API_SERVER_HOST API_SERVER_PORT <<< ${API_SERVER_ADDR}
 
 sed -i -E "s/(apiServerIp:\s*)\".*\"/\1\"${API_SERVER_HOST}\"/" manifests/${CONFIG_MAP_FILE}
 sed -i -E "s/(apiServerPort:\s*)\".*\"/\1\"${API_SERVER_PORT}\"/" manifests/${CONFIG_MAP_FILE}
+sed -i -E "s/(cubesLogLevel:\s*)\".*\"/\1\"OFF\"/" manifests/${CONFIG_MAP_FILE}
+sed -i -E "s/(cniLogLevel:\s*)\".*\"/\1\"OFF\"/" manifests/${CONFIG_MAP_FILE}
 
 sed -i -E "s/(enableMorpheusDynamicOpts:\s*)\".*\"/\1\"false\"/" manifests/${CONFIG_MAP_FILE}
 sed -i -E "s/(morpheusLogLevel:\s*)\".*\"/\1\"OFF\"/" manifests/${CONFIG_MAP_FILE}
