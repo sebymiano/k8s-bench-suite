@@ -1330,23 +1330,6 @@ info "Waiting for server monitor to be running"
 waitpod $MONITOR_SERVER_POD_NAME Running $POD_WAIT_TIMEOUT \
 	|| detect-pod-failure-reason-and-fatal $MONITOR_SERVER_POD_NAME "Failed to start server monitor pod"
 
-#--- Client monitor (different node) --------------------------------
-info "Deploying client monitor on node $CLIENT_NODE"
-cat <<EOF | kubectl apply $NAMESPACEOPT -f - >/dev/null|| fatal "Cannot create client monitor pod"
-apiVersion: v1
-kind: Pod
-metadata:
-  labels:
-    app: $MONITOR_CLIENT_DIFFERENT_NODE_POD_NAME
-  name: $MONITOR_CLIENT_DIFFERENT_NODE_POD_NAME
-spec:
-  containers:
-  - name: monitor
-    image: infrabuilder/bench-custom-monitor
-  nodeSelector:
-    kubernetes.io/hostname: $CLIENT_NODE
-EOF
-
 #--- Client monitor (same node) --------------------------------
 info "Deploying client monitor on node $SERVER_NODE"
 cat <<EOF | kubectl apply $NAMESPACEOPT -f - >/dev/null|| fatal "Cannot create client monitor pod"
@@ -1365,11 +1348,29 @@ spec:
 EOF
 
 RESOURCE_TO_CLEAN_BEFORE_EXIT="$RESOURCE_TO_CLEAN_BEFORE_EXIT pod/$MONITOR_CLIENT_SAME_NODE_POD_NAME"
-RESOURCE_TO_CLEAN_BEFORE_EXIT="$RESOURCE_TO_CLEAN_BEFORE_EXIT pod/$MONITOR_CLIENT_DIFFERENT_NODE_POD_NAME"
 
 info "Waiting for client monitor to be running (same node)"
 waitpod $MONITOR_CLIENT_SAME_NODE_POD_NAME Running $POD_WAIT_TIMEOUT \
 	|| detect-pod-failure-reason-and-fatal $MONITOR_CLIENT_SAME_NODE_POD_NAME "Failed to start client monitor pod"
+	
+#--- Client monitor (different node) --------------------------------
+info "Deploying client monitor on node $CLIENT_NODE"
+cat <<EOF | kubectl apply $NAMESPACEOPT -f - >/dev/null|| fatal "Cannot create client monitor pod"
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: $MONITOR_CLIENT_DIFFERENT_NODE_POD_NAME
+  name: $MONITOR_CLIENT_DIFFERENT_NODE_POD_NAME
+spec:
+  containers:
+  - name: monitor
+    image: infrabuilder/bench-custom-monitor
+  nodeSelector:
+    kubernetes.io/hostname: $CLIENT_NODE
+EOF
+
+RESOURCE_TO_CLEAN_BEFORE_EXIT="$RESOURCE_TO_CLEAN_BEFORE_EXIT pod/$MONITOR_CLIENT_DIFFERENT_NODE_POD_NAME"
 
 info "Waiting for client monitor to be running (different node)"
 waitpod $MONITOR_CLIENT_DIFFERENT_NODE_POD_NAME Running $POD_WAIT_TIMEOUT \
