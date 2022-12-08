@@ -41,7 +41,6 @@ import (
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -105,7 +104,7 @@ func init() {
 	flag.BoolVar(&cleanupOnly, "cleanup", false,
 		"(boolean) Run the cleanup resources phase only (use this flag to clean up orphaned resources from a test run)")
 	flag.IntVar(&testFrom, "testFrom", 0, "start from test number testFrom")
-	flag.IntVar(&testTo, "testTo", 11, "end at test number testTo")
+	flag.IntVar(&testTo, "testTo", 12, "end at test number testTo")
 	flag.IntVar(&msgSizeMin, "msgSizeMin", 1, "minimum message size")
 	flag.IntVar(&mssSizeMin, "mssSizeMin", 96, "minimum MSS size")
 }
@@ -115,8 +114,18 @@ func setupClient() (*rest.Config, *kubernetes.Clientset) {
 	if err != nil {
 		panic(err)
 	}
-	config.GroupVersion = &SchemeGroupVersion
-	config.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: scheme.Codecs}
+	config.GroupVersion = &schema.GroupVersion{Group: "", Version: "v1"}
+	if config.APIPath == "" {
+		config.APIPath = "/api"
+	}
+
+	if config.NegotiatedSerializer == nil {
+		// This codec factory ensures the resources are not converted. Therefore, resources
+		// will not be round-tripped through internal versions. Defaulting does not happen
+		// on the client.
+		config.NegotiatedSerializer = scheme.Codecs.WithoutConversion()
+	}
+	rest.SetKubernetesDefaults(config)
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -286,11 +295,11 @@ func createRCs(c *kubernetes.Clientset) bool {
 							Image: netperfImage,
 							Ports: []api.ContainerPort{{ContainerPort: orchestratorPort}},
 							Args: []string{
-								"--mode=orchestrator",
-								fmt.Sprintf("--testFrom=%d", testFrom),
-								fmt.Sprintf("--testTo=%d", testTo),
-								fmt.Sprintf("--msgSizeMin=%d", msgSizeMin),
-								fmt.Sprintf("--mssSizeMin=%d", mssSizeMin),
+								"-mode=orchestrator",
+								fmt.Sprintf("-testFrom=%d", testFrom),
+								fmt.Sprintf("-testTo=%d", testTo),
+								fmt.Sprintf("-msgSizeMin=%d", msgSizeMin),
+								fmt.Sprintf("-mssSizeMin=%d", mssSizeMin),
 							},
 							ImagePullPolicy: "Always",
 						},
@@ -345,7 +354,7 @@ func createRCs(c *kubernetes.Clientset) bool {
 								Name:            name,
 								Image:           netperfImage,
 								Ports:           portSpec,
-								Args:            []string{"--mode=worker"},
+								Args:            []string{"-mode=worker"},
 								Env:             workerEnv,
 								ImagePullPolicy: "Always",
 							},
@@ -497,6 +506,7 @@ func executeTests(c *kubernetes.Clientset, config *rest.Config) bool {
 						time.Sleep(60 * time.Second)
 						continue
 					}
+					fmt.Printf("Start transfering JSON file from pod\n")
 					t := time.Now().UTC()
 					outputFileDirectory := fmt.Sprintf("results_%s-%s", testNamespace, tag)
 					outputFilePrefix := fmt.Sprintf("%s-%s_%s.", testNamespace, tag, t.Format("20060102150405"))
