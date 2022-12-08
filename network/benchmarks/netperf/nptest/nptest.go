@@ -42,12 +42,12 @@ import (
 	"time"
 )
 
-type point struct {
-	mss         int
-	bandwidth   string
-	index       int
-	cpuSender   string
-	cpuReceiver string
+type Point struct {
+	MSS         int    `json:"mss"`
+	Bandwidth   string `json:"bandwidth"`
+	Index       int    `json:"index"`
+	CpuSender   string `json:"cpuSender"`
+	CpuReceiver string `json:"cpuReceiver"`
 }
 
 var mode string
@@ -68,7 +68,7 @@ var iperfUDPOutputRegexp *regexp.Regexp
 var netperfOutputRegexp *regexp.Regexp
 var iperfCPUOutputRegexp *regexp.Regexp
 
-var dataPoints map[string][]point
+var dataPoints map[string][]Point
 var dataPointKeys []string
 var datapointsFlushed bool
 
@@ -209,7 +209,7 @@ func init() {
 	netperfOutputRegexp = regexp.MustCompile("\\s+\\d+\\s+\\d+\\s+\\d+\\s+\\S+\\s+(\\S+)\\s+")
 	iperfCPUOutputRegexp = regexp.MustCompile(`local/sender\s(\d+\.\d+)%\s\((\d+\.\d+)%\w/(\d+\.\d+)%\w\),\sremote/receiver\s(\d+\.\d+)%\s\((\d+\.\d+)%\w/(\d+\.\d+)%\w\)`)
 
-	dataPoints = make(map[string][]point)
+	dataPoints = make(map[string][]Point)
 }
 
 func initializeOutputFiles() {
@@ -352,6 +352,7 @@ func allocateWorkToClient(workerState *workerState, workItem *WorkItem) {
 	if !datapointsFlushed {
 		fmt.Println("ALL TESTCASES AND MSS RANGES COMPLETE - GENERATING CSV OUTPUT")
 		flushDataPointsToCsv()
+		fmt.Println("ALL TESTCASES AND MSS RANGES COMPLETE - GENERATING JSON OUTPUT")
 		flushDataToJsonFile()
 		datapointsFlushed = true
 	}
@@ -399,10 +400,10 @@ func writeOutputFile(filename, data string) {
 
 func registerDataPoint(label string, mss int, value string, index int, cpuSender string, cpuReceiver string) {
 	if sl, ok := dataPoints[label]; !ok {
-		dataPoints[label] = []point{{mss: mss, bandwidth: value, index: index, cpuSender: cpuSender, cpuReceiver: cpuReceiver}}
+		dataPoints[label] = []Point{{MSS: mss, Bandwidth: value, Index: index, CpuSender: cpuSender, CpuReceiver: cpuReceiver}}
 		dataPointKeys = append(dataPointKeys, label)
 	} else {
-		dataPoints[label] = append(sl, point{mss: mss, bandwidth: value, index: index, cpuSender: cpuSender, cpuReceiver: cpuReceiver})
+		dataPoints[label] = append(sl, Point{MSS: mss, Bandwidth: value, Index: index, CpuSender: cpuSender, CpuReceiver: cpuReceiver})
 	}
 }
 
@@ -411,20 +412,7 @@ func flushDataToJsonFile() {
 	if err != nil {
 		fmt.Printf("Error writing file: %s", err.Error())
 	} else {
-		f, err := os.Create(outputJSONFile)
-
-		if err != nil {
-			log.Fatal("Unable to open file", err)
-		}
-
-		defer f.Close()
-
-		_, err2 := f.WriteString(string(jsonStr))
-
-		if err2 != nil {
-			log.Fatal("Unable to write json string to file", err2)
-		}
-
+		fmt.Println(string(jsonStr))
 		fmt.Println("END JSON DATA")
 	}
 }
@@ -439,7 +427,7 @@ func flushDataPointsToCsv() {
 		}
 		buffer = fmt.Sprintf("%-45s, Maximum,", "MSS")
 		for _, p := range points {
-			buffer = buffer + fmt.Sprintf(" %d,", p.mss)
+			buffer = buffer + fmt.Sprintf(" %d,", p.MSS)
 		}
 		break
 	}
@@ -450,14 +438,14 @@ func flushDataPointsToCsv() {
 		points := dataPoints[label]
 		var max float64
 		for _, p := range points {
-			fv, _ := strconv.ParseFloat(p.bandwidth, 64)
+			fv, _ := strconv.ParseFloat(p.Bandwidth, 64)
 			if fv > max {
 				max = fv
 			}
 		}
 		buffer = buffer + fmt.Sprintf("%f,", max)
 		for _, p := range points {
-			buffer = buffer + fmt.Sprintf("%s,", p.bandwidth)
+			buffer = buffer + fmt.Sprintf("%s,", p.Bandwidth)
 		}
 		fmt.Println(buffer)
 	}
@@ -467,7 +455,7 @@ func flushDataPointsToCsv() {
 func parseIperfTCPBandwidth(output string) string {
 	// Parses the output of iperf3 and grabs the group Mbits/sec from the output
 	match := iperfTCPOutputRegexp.FindStringSubmatch(output)
-	if match != nil && len(match) > 1 {
+	if len(match) > 1 {
 		return match[1]
 	}
 	return "0"
@@ -495,7 +483,7 @@ func parseQperfTCPLatency(output string) string {
 func parseIperfSctpBandwidth(output string) string {
 	// Parses the output of iperf3 and grabs the group Mbits/sec from the output
 	match := iperfSCTPOutputRegexp.FindStringSubmatch(output)
-	if match != nil && len(match) > 1 {
+	if len(match) > 1 {
 		return match[1]
 	}
 	return "0"
@@ -504,7 +492,7 @@ func parseIperfSctpBandwidth(output string) string {
 func parseIperfUDPBandwidth(output string) string {
 	// Parses the output of iperf3 (UDP mode) and grabs the Mbits/sec from the output
 	match := iperfUDPOutputRegexp.FindStringSubmatch(output)
-	if match != nil && len(match) > 1 {
+	if len(match) > 1 {
 		return match[1]
 	}
 	return "0"
@@ -513,7 +501,7 @@ func parseIperfUDPBandwidth(output string) string {
 func parseIperfCPUUsage(output string) (string, string) {
 	// Parses the output of iperf and grabs the CPU usage on sender and receiver side from the output
 	match := iperfCPUOutputRegexp.FindStringSubmatch(output)
-	if match != nil && len(match) > 1 {
+	if len(match) > 1 {
 		return match[1], match[4]
 	}
 	return "0", "0"
@@ -522,7 +510,7 @@ func parseIperfCPUUsage(output string) (string, string) {
 func parseNetperfBandwidth(output string) string {
 	// Parses the output of netperf and grabs the Bbits/sec from the output
 	match := netperfOutputRegexp.FindStringSubmatch(output)
-	if match != nil && len(match) > 1 {
+	if len(match) > 1 {
 		return match[1]
 	}
 	return "0"
@@ -683,7 +671,7 @@ func isIPv6(address string) bool {
 
 // startWork : Entry point to the worker infinite loop
 func startWork() {
-	for true {
+	for {
 		var timeout time.Duration
 		var client *rpc.Client
 		var err error
@@ -694,7 +682,7 @@ func startWork() {
 		}
 
 		timeout = 5
-		for true {
+		for {
 			fmt.Println("Attempting to connect to orchestrator at", host)
 			client, err = rpc.DialHTTP("tcp", address+":"+port)
 			if err == nil {
@@ -704,7 +692,7 @@ func startWork() {
 			time.Sleep(timeout * time.Second)
 		}
 
-		for true {
+		for {
 			clientData := ClientRegistrationData{Host: podname, KubeNode: kubenode, Worker: worker, IP: getMyIP()}
 			var workItem WorkItem
 
@@ -715,18 +703,18 @@ func startWork() {
 			}
 
 			switch {
-			case workItem.IsIdle == true:
+			case workItem.IsIdle:
 				time.Sleep(5 * time.Second)
 				continue
 
-			case workItem.IsServerItem == true:
+			case workItem.IsServerItem:
 				fmt.Println("Orchestrator requests worker run iperf and netperf servers")
 				go iperfServer()
 				go qperfServer()
 				go netperfServer()
 				time.Sleep(1 * time.Second)
 
-			case workItem.IsClientItem == true:
+			case workItem.IsClientItem:
 				handleClientWorkItem(client, &workItem)
 			}
 		}

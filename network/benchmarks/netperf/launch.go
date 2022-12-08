@@ -54,6 +54,7 @@ import (
 const (
 	csvDataMarker      = "GENERATING CSV OUTPUT"
 	csvEndDataMarker   = "END CSV DATA"
+	jsonDataMarker     = "GENERATING JSON OUTPUT"
 	jsonEndDataMarker  = "END JSON DATA"
 	runUUID            = "latest"
 	orchestratorPort   = 5202
@@ -420,19 +421,21 @@ func getCsvResultsFromPod(c *kubernetes.Clientset, podName string) *string {
 	return &csvData
 }
 
-// Retrieve the logs for the pod/container and check if csv data has been generated
-func getJsonResultsFromPod(c *kubernetes.Clientset, podName string) bool {
+// Retrieve the logs for the pod/container and check if json data has been generated
+func getJsonResultsFromPod(c *kubernetes.Clientset, podName string) *string {
 	body, err := c.CoreV1().Pods(testNamespace).GetLogs(podName, &api.PodLogOptions{Timestamps: false}).DoRaw(context.TODO())
 	if err != nil {
 		fmt.Printf("Error (%s) reading logs from pod %s", err, podName)
-		return false
+		return nil
 	}
 	logData := string(body)
-	index := strings.Index(logData, jsonEndDataMarker)
-	if index == -1 {
-		return false
+	index := strings.Index(logData, jsonDataMarker)
+	endIndex := strings.Index(logData, jsonEndDataMarker)
+	if index == -1 || endIndex == -1 {
+		return nil
 	}
-	return true
+	jsonData := string(body[index+len(jsonDataMarker)+1 : endIndex])
+	return &jsonData
 }
 
 // processCsvData : Process the CSV datafile and generate line and bar graphs
@@ -455,6 +458,33 @@ func processCsvData(csvData *string) bool {
 		return false
 	}
 	_, err = fd.WriteString(*csvData)
+	if err != nil {
+		fmt.Println("Error writing string", err)
+		return false
+	}
+	fd.Close()
+	return true
+}
+
+func processJsonData(jsonData *string) bool {
+	t := time.Now().UTC()
+	outputFileDirectory := fmt.Sprintf("results_%s-%s", testNamespace, tag)
+	outputFilePrefix := fmt.Sprintf("%s-%s_%s.", testNamespace, tag, t.Format("20060102150405"))
+	fmt.Printf("Test concluded - JSON raw data written to %s/%sjson\n", outputFileDirectory, outputFilePrefix)
+	if _, err := os.Stat(outputFileDirectory); os.IsNotExist(err) {
+		err := os.Mkdir(outputFileDirectory, 0766)
+		if err != nil {
+			fmt.Println("Error creating directory", err)
+			return false
+		}
+
+	}
+	fd, err := os.OpenFile(fmt.Sprintf("%s/%sjson", outputFileDirectory, outputFilePrefix), os.O_RDWR|os.O_CREATE, 0666)
+	if err != nil {
+		fmt.Println("ERROR writing output JSON datafile", err)
+		return false
+	}
+	_, err = fd.WriteString(*jsonData)
 	if err != nil {
 		fmt.Println("Error writing string", err)
 		return false
@@ -502,24 +532,28 @@ func executeTests(c *kubernetes.Clientset, config *rest.Config) bool {
 			}
 			if processCsvData(csvdata) {
 				for {
-					if !getJsonResultsFromPod(c, orchestratorPodName) {
+					jsonData := getJsonResultsFromPod(c, orchestratorPodName)
+					if jsonData == nil {
 						fmt.Println("Scanned orchestrator pod filesystem - no results file found yet...waiting for orchestrator to write JSON file...")
 						time.Sleep(60 * time.Second)
 						continue
 					}
-					fmt.Printf("Start transfering JSON file from pod\n")
-					t := time.Now().UTC()
-					outputFileDirectory := fmt.Sprintf("results_%s-%s", testNamespace, tag)
-					outputFilePrefix := fmt.Sprintf("%s-%s_%s.", testNamespace, tag, t.Format("20060102150405"))
-					localJsonFilePath := fmt.Sprintf("%s/%sjson", outputFileDirectory, outputFilePrefix)
-					_, out, _, err := copyFileFromThePod(c, config, remoteJSONFilePath, localJsonFilePath, orchestratorPodName, testNamespace)
-					if err != nil {
-						fmt.Printf("%v\n", err)
-						return false
+					if processJsonData(jsonData) {
+						break
 					}
-					fmt.Println("out:")
-					fmt.Printf("%s", out.String())
-					break
+					// fmt.Printf("Start transfering JSON file from pod\n")
+					// t := time.Now().UTC()
+					// outputFileDirectory := fmt.Sprintf("results_%s-%s", testNamespace, tag)
+					// outputFilePrefix := fmt.Sprintf("%s-%s_%s.", testNamespace, tag, t.Format("20060102150405"))
+					// localJsonFilePath := fmt.Sprintf("%s/%sjson", outputFileDirectory, outputFilePrefix)
+					// _, out, _, err := copyFileFromThePod(c, config, remoteJSONFilePath, localJsonFilePath, orchestratorPodName, testNamespace)
+					// if err != nil {
+					// 	fmt.Printf("%v\n", err)
+					// 	return false
+					// }
+					// fmt.Println("out:")
+					// fmt.Printf("%s", out.String())
+					// break
 				}
 				break
 			}
