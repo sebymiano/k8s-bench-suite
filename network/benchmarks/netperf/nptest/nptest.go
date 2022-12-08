@@ -26,6 +26,7 @@ package main
 // Imports only base Golang packages
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -42,9 +43,11 @@ import (
 )
 
 type point struct {
-	mss       int
-	bandwidth string
-	index     int
+	mss         int
+	bandwidth   string
+	index       int
+	cpuSender   string
+	cpuReceiver string
 }
 
 var mode string
@@ -79,6 +82,7 @@ const (
 	netperfPath          = "/usr/local/bin/netperf"
 	netperfServerPath    = "/usr/local/bin/netserver"
 	outputCaptureFile    = "/tmp/output.txt"
+	outputJSONFile       = "/tmp/results.json"
 	mssMin               = 96
 	mssMax               = 1460
 	mssStepSize          = 64
@@ -185,10 +189,10 @@ func init() {
 		{SourceNode: "netperf-w3", DestinationNode: "netperf-w2", Label: "9 iperf TCP. Remote VM using Virtual IP", Type: iperfTCPTest, ClusterIP: true, MSS: mssSizeMinParam},
 		// {SourceNode: "netperf-w2", DestinationNode: "netperf-w2", Label: "10 iperf TCP. Hairpin Pod to own Virtual IP", Type: iperfTCPTest, ClusterIP: true, MSS: mssSizeMinParam},
 
-		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "11 iperf UDP. Same VM using Pod IP", Type: iperfUDPTest, ClusterIP: false, MSS: mssMax},
-		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "12 iperf UDP. Same VM using Virtual IP", Type: iperfUDPTest, ClusterIP: true, MSS: mssMax},
-		{SourceNode: "netperf-w1", DestinationNode: "netperf-w3", Label: "13 iperf UDP. Remote VM using Pod IP", Type: iperfUDPTest, ClusterIP: false, MSS: mssMax},
-		{SourceNode: "netperf-w3", DestinationNode: "netperf-w2", Label: "14 iperf UDP. Remote VM using Virtual IP", Type: iperfUDPTest, ClusterIP: true, MSS: mssMax},
+		// {SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "11 iperf UDP. Same VM using Pod IP", Type: iperfUDPTest, ClusterIP: false, MSS: mssMax},
+		// {SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "12 iperf UDP. Same VM using Virtual IP", Type: iperfUDPTest, ClusterIP: true, MSS: mssMax},
+		// {SourceNode: "netperf-w1", DestinationNode: "netperf-w3", Label: "13 iperf UDP. Remote VM using Pod IP", Type: iperfUDPTest, ClusterIP: false, MSS: mssMax},
+		// {SourceNode: "netperf-w3", DestinationNode: "netperf-w2", Label: "14 iperf UDP. Remote VM using Virtual IP", Type: iperfUDPTest, ClusterIP: true, MSS: mssMax},
 
 		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "15 netperf. Same VM using Pod IP", Type: netperfTest, ClusterIP: false},
 		{SourceNode: "netperf-w1", DestinationNode: "netperf-w2", Label: "16 netperf. Same VM using Virtual IP", Type: netperfTest, ClusterIP: true},
@@ -348,6 +352,7 @@ func allocateWorkToClient(workerState *workerState, workItem *WorkItem) {
 	if !datapointsFlushed {
 		fmt.Println("ALL TESTCASES AND MSS RANGES COMPLETE - GENERATING CSV OUTPUT")
 		flushDataPointsToCsv()
+		flushDataToJsonFile()
 		datapointsFlushed = true
 	}
 
@@ -392,12 +397,35 @@ func writeOutputFile(filename, data string) {
 	}
 }
 
-func registerDataPoint(label string, mss int, value string, index int) {
+func registerDataPoint(label string, mss int, value string, index int, cpuSender string, cpuReceiver string) {
 	if sl, ok := dataPoints[label]; !ok {
-		dataPoints[label] = []point{{mss: mss, bandwidth: value, index: index}}
+		dataPoints[label] = []point{{mss: mss, bandwidth: value, index: index, cpuSender: cpuSender, cpuReceiver: cpuReceiver}}
 		dataPointKeys = append(dataPointKeys, label)
 	} else {
-		dataPoints[label] = append(sl, point{mss: mss, bandwidth: value, index: index})
+		dataPoints[label] = append(sl, point{mss: mss, bandwidth: value, index: index, cpuSender: cpuSender, cpuReceiver: cpuReceiver})
+	}
+}
+
+func flushDataToJsonFile() {
+	jsonStr, err := json.Marshal(dataPoints)
+	if err != nil {
+		fmt.Printf("Error writing file: %s", err.Error())
+	} else {
+		f, err := os.Create(outputJSONFile)
+
+		if err != nil {
+			log.Fatal("Unable to open file", err)
+		}
+
+		defer f.Close()
+
+		_, err2 := f.WriteString(string(jsonStr))
+
+		if err2 != nil {
+			log.Fatal("Unable to write json string to file", err2)
+		}
+
+		fmt.Println("END JSON DATA")
 	}
 }
 
@@ -520,7 +548,7 @@ func (t *NetPerfRPC) ReceiveOutput(data *WorkerOutput, reply *int) error {
 		writeOutputFile(outputCaptureFile, outputLog)
 		bw = parseIperfTCPBandwidth(data.Output)
 		cpuSender, cpuReceiver = parseIperfCPUUsage(data.Output)
-		registerDataPoint(testcase.Label, mss, bw, currentJobIndex)
+		registerDataPoint(testcase.Label, mss, bw, currentJobIndex, cpuSender, cpuReceiver)
 
 	case qperfTCPTest:
 		msgSize := testcases[currentJobIndex].MsgSize / 2
@@ -529,7 +557,7 @@ func (t *NetPerfRPC) ReceiveOutput(data *WorkerOutput, reply *int) error {
 		writeOutputFile(outputCaptureFile, outputLog)
 		bw = parseQperfTCPLatency(data.Output)
 		cpuSender, cpuReceiver = "na", "na"
-		registerDataPoint(testcase.Label, msgSize, bw, currentJobIndex)
+		registerDataPoint(testcase.Label, msgSize, bw, currentJobIndex, cpuSender, cpuReceiver)
 
 	case iperfSctpTest:
 		mss := testcases[currentJobIndex].MSS - mssStepSize
@@ -538,7 +566,7 @@ func (t *NetPerfRPC) ReceiveOutput(data *WorkerOutput, reply *int) error {
 		writeOutputFile(outputCaptureFile, outputLog)
 		bw = parseIperfSctpBandwidth(data.Output)
 		cpuSender, cpuReceiver = parseIperfCPUUsage(data.Output)
-		registerDataPoint(testcase.Label, mss, bw, currentJobIndex)
+		registerDataPoint(testcase.Label, mss, bw, currentJobIndex, cpuSender, cpuReceiver)
 
 	case iperfUDPTest:
 		mss := testcases[currentJobIndex].MSS - mssStepSize
@@ -546,14 +574,14 @@ func (t *NetPerfRPC) ReceiveOutput(data *WorkerOutput, reply *int) error {
 			"from", testcase.SourceNode, "to", testcase.DestinationNode, "MSS:", mss) + data.Output
 		writeOutputFile(outputCaptureFile, outputLog)
 		bw = parseIperfUDPBandwidth(data.Output)
-		registerDataPoint(testcase.Label, mss, bw, currentJobIndex)
+		registerDataPoint(testcase.Label, mss, bw, currentJobIndex, "na", "na")
 
 	case netperfTest:
 		outputLog = outputLog + fmt.Sprintln("Received netperf output from worker", data.Worker, "for test", testcase.Label,
 			"from", testcase.SourceNode, "to", testcase.DestinationNode) + data.Output
 		writeOutputFile(outputCaptureFile, outputLog)
 		bw = parseNetperfBandwidth(data.Output)
-		registerDataPoint(testcase.Label, 0, bw, currentJobIndex)
+		registerDataPoint(testcase.Label, 0, bw, currentJobIndex, "na", "na")
 		testcases[currentJobIndex].Finished = true
 
 	}

@@ -27,8 +27,11 @@ limitations under the License.
 package main
 
 import (
+	"bytes"
+	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -38,19 +41,25 @@ import (
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubectl/pkg/cmd/cp"
+	"k8s.io/kubectl/pkg/cmd/util"
 )
 
 const (
-	csvDataMarker    = "GENERATING CSV OUTPUT"
-	csvEndDataMarker = "END CSV DATA"
-	runUUID          = "latest"
-	orchestratorPort = 5202
-	iperf3Port       = 5201
-	qperf19766       = 19766
-	qperf19765       = 19765
-	netperfPort      = 12865
+	csvDataMarker      = "GENERATING CSV OUTPUT"
+	csvEndDataMarker   = "END CSV DATA"
+	jsonEndDataMarker  = "END JSON DATA"
+	runUUID            = "latest"
+	orchestratorPort   = 5202
+	iperf3Port         = 5201
+	qperf19766         = 19766
+	qperf19765         = 19765
+	netperfPort        = 12865
+	remoteJSONFilePath = "/tmp/results.json"
 )
 
 var (
@@ -79,7 +88,7 @@ func init() {
 	flag.IntVar(&iterations, "iterations", 1,
 		"Number of iterations to run")
 	flag.StringVar(&tag, "tag", runUUID, "CSV file suffix")
-	flag.StringVar(&netperfImage, "image", "sebymiano92/netperf-latest", "Docker image used to run the network tests")
+	flag.StringVar(&netperfImage, "image", "sebymiano/netperf-latest", "Docker image used to run the network tests")
 	flag.StringVar(&testNamespace, "namespace", "netperf", "Test namespace to run netperf pods")
 	defaultKubeConfig := fmt.Sprintf("%s/.kube/config", os.Getenv("HOME"))
 	flag.StringVar(&kubeConfig, "kubeConfig", defaultKubeConfig,
@@ -89,12 +98,12 @@ func init() {
 	flag.BoolVar(&cleanupOnly, "cleanup", false,
 		"(boolean) Run the cleanup resources phase only (use this flag to clean up orphaned resources from a test run)")
 	flag.IntVar(&testFrom, "testFrom", 0, "start from test number testFrom")
-	flag.IntVar(&testTo, "testTo", 16, "end at test number testTo")
+	flag.IntVar(&testTo, "testTo", 11, "end at test number testTo")
 	flag.IntVar(&msgSizeMin, "msgSizeMin", 1, "minimum message size")
 	flag.IntVar(&mssSizeMin, "mssSizeMin", 96, "minimum MSS size")
 }
 
-func setupClient() *kubernetes.Clientset {
+func setupClient() (*rest.Config, *kubernetes.Clientset) {
 	config, err := clientcmd.BuildConfigFromFlags("", kubeConfig)
 	if err != nil {
 		panic(err)
@@ -104,12 +113,12 @@ func setupClient() *kubernetes.Clientset {
 		panic(err)
 	}
 
-	return clientset
+	return config, clientset
 }
 
 // getMinions : Only return schedulable/worker nodes
 func getMinionNodes(c *kubernetes.Clientset) *api.NodeList {
-	nodes, err := c.CoreV1().Nodes().List(
+	nodes, err := c.CoreV1().Nodes().List(context.TODO(),
 		metav1.ListOptions{
 			FieldSelector: "spec.unschedulable=false",
 		})
@@ -122,30 +131,30 @@ func getMinionNodes(c *kubernetes.Clientset) *api.NodeList {
 
 func cleanup(c *kubernetes.Clientset) {
 	// Cleanup existing rcs, pods and services in our namespace
-	rcs, err := c.CoreV1().ReplicationControllers(testNamespace).List(everythingSelector)
+	rcs, err := c.CoreV1().ReplicationControllers(testNamespace).List(context.TODO(), everythingSelector)
 	if err != nil {
 		fmt.Println("Failed to get replication controllers", err)
 		return
 	}
 	for _, rc := range rcs.Items {
 		fmt.Println("Deleting rc", rc.GetName())
-		if err := c.CoreV1().ReplicationControllers(testNamespace).Delete(
-			rc.GetName(), &metav1.DeleteOptions{}); err != nil {
+		if err := c.CoreV1().ReplicationControllers(testNamespace).Delete(context.TODO(),
+			rc.GetName(), metav1.DeleteOptions{}); err != nil {
 			fmt.Println("Failed to delete rc", rc.GetName(), err)
 		}
 	}
-	pods, err := c.CoreV1().Pods(testNamespace).List(everythingSelector)
+	pods, err := c.CoreV1().Pods(testNamespace).List(context.TODO(), everythingSelector)
 	if err != nil {
 		fmt.Println("Failed to get pods", err)
 		return
 	}
 	for _, pod := range pods.Items {
 		fmt.Println("Deleting pod", pod.GetName())
-		if err := c.CoreV1().Pods(testNamespace).Delete(pod.GetName(), &metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
+		if err := c.CoreV1().Pods(testNamespace).Delete(context.TODO(), pod.GetName(), metav1.DeleteOptions{GracePeriodSeconds: new(int64)}); err != nil {
 			fmt.Println("Failed to delete pod", pod.GetName(), err)
 		}
 	}
-	svcs, err := c.CoreV1().Services(testNamespace).List(everythingSelector)
+	svcs, err := c.CoreV1().Services(testNamespace).List(context.TODO(), everythingSelector)
 	if err != nil {
 		fmt.Println("Failed to get services", err)
 		return
@@ -153,7 +162,7 @@ func cleanup(c *kubernetes.Clientset) {
 	for _, svc := range svcs.Items {
 		fmt.Println("Deleting svc", svc.GetName())
 		err := c.CoreV1().Services(testNamespace).Delete(
-			svc.GetName(), &metav1.DeleteOptions{})
+			context.TODO(), svc.GetName(), metav1.DeleteOptions{})
 		if err != nil {
 			fmt.Println("Failed to get service", err)
 		}
@@ -163,8 +172,8 @@ func cleanup(c *kubernetes.Clientset) {
 // createServices: Long-winded function to programmatically create our two services
 func createServices(c *kubernetes.Clientset) bool {
 	// Create our namespace if not present
-	if _, err := c.CoreV1().Namespaces().Get(testNamespace, metav1.GetOptions{}); err != nil {
-		_, err := c.CoreV1().Namespaces().Create(&api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}})
+	if _, err := c.CoreV1().Namespaces().Get(context.TODO(), testNamespace, metav1.GetOptions{}); err != nil {
+		_, err := c.CoreV1().Namespaces().Create(context.TODO(), &api.Namespace{ObjectMeta: metav1.ObjectMeta{Name: testNamespace}}, metav1.CreateOptions{})
 		if err != nil {
 			fmt.Println("Failed to create service", err)
 		}
@@ -187,7 +196,7 @@ func createServices(c *kubernetes.Clientset) bool {
 			Type: api.ServiceTypeClusterIP,
 		},
 	}
-	if _, err := c.CoreV1().Services(testNamespace).Create(orchService); err != nil {
+	if _, err := c.CoreV1().Services(testNamespace).Create(context.TODO(), orchService, metav1.CreateOptions{}); err != nil {
 		fmt.Println("Failed to create orchestrator service", err)
 		return false
 	}
@@ -236,7 +245,7 @@ func createServices(c *kubernetes.Clientset) bool {
 			Type: api.ServiceTypeClusterIP,
 		},
 	}
-	if _, err := c.CoreV1().Services(testNamespace).Create(netperfW2Service); err != nil {
+	if _, err := c.CoreV1().Services(testNamespace).Create(context.TODO(), netperfW2Service, metav1.CreateOptions{}); err != nil {
 		fmt.Println("Failed to create netperf-w2 service", err)
 		return false
 	}
@@ -251,7 +260,7 @@ func createRCs(c *kubernetes.Clientset) bool {
 	fmt.Println("Creating replication controller", name)
 	replicas := int32(1)
 
-	_, err := c.CoreV1().ReplicationControllers(testNamespace).Create(&api.ReplicationController{
+	_, err := c.CoreV1().ReplicationControllers(testNamespace).Create(context.TODO(), &api.ReplicationController{
 		ObjectMeta: metav1.ObjectMeta{Name: name},
 		Spec: api.ReplicationControllerSpec{
 			Replicas: &replicas,
@@ -280,7 +289,7 @@ func createRCs(c *kubernetes.Clientset) bool {
 				},
 			},
 		},
-	})
+	}, metav1.CreateOptions{})
 	if err != nil {
 		fmt.Println("Error creating orchestrator replication controller", err)
 		return false
@@ -310,7 +319,7 @@ func createRCs(c *kubernetes.Clientset) bool {
 
 		replicas := int32(1)
 
-		_, err := c.CoreV1().ReplicationControllers(testNamespace).Create(&api.ReplicationController{
+		_, err := c.CoreV1().ReplicationControllers(testNamespace).Create(context.TODO(), &api.ReplicationController{
 			ObjectMeta: metav1.ObjectMeta{Name: name},
 			Spec: api.ReplicationControllerSpec{
 				Replicas: &replicas,
@@ -335,7 +344,7 @@ func createRCs(c *kubernetes.Clientset) bool {
 					},
 				},
 			},
-		})
+		}, metav1.CreateOptions{})
 		if err != nil {
 			fmt.Println("Error creating orchestrator replication controller", name, ":", err)
 			return false
@@ -354,9 +363,29 @@ func getOrchestratorPodName(pods *api.PodList) string {
 	return ""
 }
 
+func copyFileFromThePod(c *kubernetes.Clientset, config *rest.Config, sourceFilePath string, destinationFilePath string, containername, namespace string) (*bytes.Buffer, *bytes.Buffer, *bytes.Buffer, error) {
+	ioStreams, in, out, errOut := genericclioptions.NewTestIOStreams()
+	copyOptions := cp.NewCopyOptions(ioStreams)
+	copyOptions.Clientset = c
+	copyOptions.ClientConfig = config
+	copyOptions.Container = containername
+	var copt genericclioptions.RESTClientGetter = &genericclioptions.ConfigFlags{}
+
+	nf := util.NewFactory(copt)
+	cobra := cp.NewCmdCp(nf, ioStreams)
+	sourceFilePath = namespace + "/" + containername + ":" + sourceFilePath
+	cobra.Run(cobra, []string{sourceFilePath, destinationFilePath})
+
+	err := cobra.Execute()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return in, out, errOut, nil
+}
+
 // Retrieve the logs for the pod/container and check if csv data has been generated
 func getCsvResultsFromPod(c *kubernetes.Clientset, podName string) *string {
-	body, err := c.CoreV1().Pods(testNamespace).GetLogs(podName, &api.PodLogOptions{Timestamps: false}).DoRaw()
+	body, err := c.CoreV1().Pods(testNamespace).GetLogs(podName, &api.PodLogOptions{Timestamps: false}).DoRaw(context.TODO())
 	if err != nil {
 		fmt.Printf("Error (%s) reading logs from pod %s", err, podName)
 		return nil
@@ -369,6 +398,21 @@ func getCsvResultsFromPod(c *kubernetes.Clientset, podName string) *string {
 	}
 	csvData := string(body[index+len(csvDataMarker)+1 : endIndex])
 	return &csvData
+}
+
+// Retrieve the logs for the pod/container and check if csv data has been generated
+func getJsonResultsFromPod(c *kubernetes.Clientset, podName string) bool {
+	body, err := c.CoreV1().Pods(testNamespace).GetLogs(podName, &api.PodLogOptions{Timestamps: false}).DoRaw(context.TODO())
+	if err != nil {
+		fmt.Printf("Error (%s) reading logs from pod %s", err, podName)
+		return false
+	}
+	logData := string(body)
+	index := strings.Index(logData, jsonEndDataMarker)
+	if index == -1 {
+		return false
+	}
+	return true
 }
 
 // processCsvData : Process the CSV datafile and generate line and bar graphs
@@ -399,7 +443,7 @@ func processCsvData(csvData *string) bool {
 	return true
 }
 
-func executeTests(c *kubernetes.Clientset) bool {
+func executeTests(c *kubernetes.Clientset, config *rest.Config) bool {
 	for i := 0; i < iterations; i++ {
 		cleanup(c)
 		if !createServices(c) {
@@ -419,7 +463,7 @@ func executeTests(c *kubernetes.Clientset) bool {
 			time.Sleep(60 * time.Second)
 			var pods *api.PodList
 			var err error
-			if pods, err = c.CoreV1().Pods(testNamespace).List(everythingSelector); err != nil {
+			if pods, err = c.CoreV1().Pods(testNamespace).List(context.TODO(), everythingSelector); err != nil {
 				fmt.Println("Failed to fetch pods - waiting for pod creation", err)
 				continue
 			}
@@ -437,6 +481,25 @@ func executeTests(c *kubernetes.Clientset) bool {
 				continue
 			}
 			if processCsvData(csvdata) {
+				for {
+					if !getJsonResultsFromPod(c, orchestratorPodName) {
+						fmt.Println("Scanned orchestrator pod filesystem - no results file found yet...waiting for orchestrator to write JSON file...")
+						time.Sleep(60 * time.Second)
+						continue
+					}
+					t := time.Now().UTC()
+					outputFileDirectory := fmt.Sprintf("results_%s-%s", testNamespace, tag)
+					outputFilePrefix := fmt.Sprintf("%s-%s_%s.", testNamespace, tag, t.Format("20060102150405"))
+					localJsonFilePath := fmt.Sprintf("%s/%sjson", outputFileDirectory, outputFilePrefix)
+					_, out, _, err := copyFileFromThePod(c, config, remoteJSONFilePath, localJsonFilePath, orchestratorPodName, testNamespace)
+					if err != nil {
+						fmt.Printf("%v\n", err)
+						return false
+					}
+					fmt.Println("out:")
+					fmt.Printf("%s", out.String())
+					break
+				}
 				break
 			}
 		}
@@ -456,7 +519,8 @@ func main() {
 	fmt.Println("------------------------------------------------------------")
 
 	var c *kubernetes.Clientset
-	if c = setupClient(); c == nil {
+	var config *rest.Config
+	if config, c = setupClient(); c == nil {
 		fmt.Println("Failed to setup REST client to Kubernetes cluster")
 		return
 	}
@@ -494,6 +558,6 @@ func main() {
 		os.Exit(1)
 	}()
 
-	executeTests(c)
+	executeTests(c, config)
 	cleanup(c)
 }

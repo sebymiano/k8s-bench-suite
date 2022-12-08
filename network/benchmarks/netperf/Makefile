@@ -14,7 +14,7 @@
 
 all: docker push launch runtests
 
-DOCKERREPO       := sebymiano92/netperf-latest
+DOCKERREPO       := sebymiano/netperf-latest
 
 docker: launch
 	mkdir -p Dockerbuild/nptest && \

@@ -21,7 +21,7 @@
 #
 # Args: --mode=worker --host=<service cluster ip> --port=5202
 #
-ARG GOLANG_VERSION=1.18
+ARG GOLANG_VERSION=1.19
 FROM golang:${GOLANG_VERSION} as builder
 WORKDIR /workspace
 
@@ -31,12 +31,12 @@ COPY go.mod go.mod
 
 RUN go build -o nptests
 
-FROM debian:jessie
+FROM debian:stable
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
 # install binary and remove cache
 RUN apt-get update \
-    && apt-get install -y  curl wget net-tools gcc make libsctp-dev git autotools-dev automake \
+    && apt-get install -y  curl wget net-tools gcc make libsctp-dev git autotools-dev automake texinfo \
     && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /tmp
 
@@ -48,12 +48,18 @@ RUN git clone https://github.com/linux-rdma/qperf.git \
     && make && make install
 
 # Download and build iperf3 from sources
-RUN curl -LO https://downloads.es.net/pub/iperf/iperf-3.1.tar.gz && tar zxf iperf-3.1.tar.gz
-RUN cd iperf-3.1 && ./configure --prefix=/usr/local --bindir /usr/local/bin && make && make install
+RUN curl -LO https://downloads.es.net/pub/iperf/iperf-3.9.tar.gz && tar zxf iperf-3.9.tar.gz
+RUN cd iperf-3.9 && ./configure --prefix=/usr/local --bindir /usr/local/bin && make && make install
 
 # Download and build netperf from sources
-RUN curl -LO https://github.com/HewlettPackard/netperf/archive/netperf-2.7.0.tar.gz && tar -xzf netperf-2.7.0.tar.gz && mv netperf-netperf-2.7.0/ netperf-2.7.0
-RUN cd netperf-2.7.0 && ./configure --prefix=/usr/local --bindir /usr/local/bin && make && make install
+# RUN curl -LO https://github.com/HewlettPackard/netperf/archive/netperf-2.7.0.tar.gz && tar -xzf netperf-2.7.0.tar.gz && mv netperf-netperf-2.7.0/ netperf-2.7.0
+# RUN cd netperf-2.7.0 && ./configure --prefix=/usr/local --bindir /usr/local/bin && make && make install
+RUN git clone https://github.com/HewlettPackard/netperf.git \
+    && cd netperf \
+    && ./autogen.sh \
+    && ./configure --prefix=/usr/local --bindir /usr/local/bin \
+    && make CFLAGS=-fcommon \
+    && make install
 
 COPY --from=builder /workspace/nptests /usr/bin/
 
