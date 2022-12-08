@@ -40,6 +40,8 @@ import (
 
 	api "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/kubernetes"
@@ -47,6 +49,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/kubectl/pkg/cmd/cp"
 	"k8s.io/kubectl/pkg/cmd/util"
+	"k8s.io/kubectl/pkg/scheme"
 )
 
 const (
@@ -82,6 +85,10 @@ var (
 	msgSizeMin, mssSizeMin int
 )
 
+const GroupName = "api"
+
+var SchemeGroupVersion = schema.GroupVersion{Group: GroupName, Version: "v1"}
+
 func init() {
 	flag.BoolVar(&hostnetworking, "hostnetworking", false,
 		"(boolean) Enable Host Networking Mode for PODs")
@@ -108,6 +115,9 @@ func setupClient() (*rest.Config, *kubernetes.Clientset) {
 	if err != nil {
 		panic(err)
 	}
+	config.GroupVersion = &SchemeGroupVersion
+	config.NegotiatedSerializer = serializer.WithoutConversionCodecFactory{CodecFactory: scheme.Codecs}
+
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
 		panic(err)
