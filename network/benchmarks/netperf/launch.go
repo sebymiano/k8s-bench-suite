@@ -388,9 +388,10 @@ func copyFileFromThePod(c *kubernetes.Clientset, config *rest.Config, sourceFile
 	copyOptions.Clientset = c
 	copyOptions.ClientConfig = config
 	copyOptions.Container = containername
-	var copt genericclioptions.RESTClientGetter = &genericclioptions.ConfigFlags{}
-
-	nf := util.NewFactory(copt)
+	// var copt genericclioptions.RESTClientGetter = &genericclioptions.ConfigFlags{}
+	var defaultConfigFlags = genericclioptions.NewConfigFlags(true).WithDeprecatedPasswordFlag().WithDiscoveryBurst(300).WithDiscoveryQPS(50.0)
+	matchVersionKubeConfigFlags := util.NewMatchVersionFlags(defaultConfigFlags)
+	nf := util.NewFactory(matchVersionKubeConfigFlags)
 	cobra := cp.NewCmdCp(nf, ioStreams)
 	sourceFilePath = namespace + "/" + containername + ":" + sourceFilePath
 	cobra.Run(cobra, []string{sourceFilePath, destinationFilePath})
