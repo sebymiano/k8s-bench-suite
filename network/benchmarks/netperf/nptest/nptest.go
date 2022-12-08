@@ -752,12 +752,18 @@ func iperfClient(serverHost, serverPort string, mss int, workItemType int) (rv s
 		var output string
 		var success bool
 		if mss == iperf3AutoParams {
-			output, success = cmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-V", "-N", "-i", "30", "-t", "10", "-f", "m", "-Z", "-P", parallelStreams}, 15)
+			iperf3Cmd := []string{iperf3Path, "-c", serverHost, "-V", "-N", "-i", "30", "-t", "10", "-f", "m", "-Z", "-P", parallelStreams}
+			fmt.Println(iperf3Cmd)
+			output, success = cmdExec(iperf3Path, iperf3Cmd, 15)
 		} else {
-			output, success = cmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-V", "-N", "-i", "30", "-t", "10", "-f", "m", "-w", "512M", "-Z", "-P", parallelStreams, "-M", strconv.Itoa(mss)}, 15)
+			iperf3Cmd := []string{iperf3Path, "-c", serverHost, "-V", "-N", "-i", "30", "-t", "10", "-f", "m", "-w", "512M", "-Z", "-P", parallelStreams, "-M", strconv.Itoa(mss)}
+			fmt.Println(iperf3Cmd)
+			output, success = cmdExec(iperf3Path, iperf3Cmd, 15)
 		}
 		if success {
 			rv = output
+		} else {
+			log.Fatal("Unable to run iperf3 client")
 		}
 
 	case workItemType == iperfSctpTest:
