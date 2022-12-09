@@ -63,7 +63,10 @@ EOF
 echo -e "${COLOR_GREEN}[ INFO ] Install custom resources ${COLOR_OFF}"
 kubectl create -f ${DIR}/custom-resources.yaml
 
-kubectl taint nodes --all node-role.kubernetes.io/control-plane- node-role.kubernetes.io/master-
+sleep 10
+set +e
+kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+set -e
 
 echo -e "${COLOR_GREEN}[ INFO ] Calico CNI installed. Wait until all services boot up ${COLOR_OFF}"
 kubectl wait --for=condition=Ready nodes --all --timeout=180s

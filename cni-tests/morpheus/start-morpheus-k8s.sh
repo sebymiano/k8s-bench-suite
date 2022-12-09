@@ -69,7 +69,9 @@ kubectl wait --for=condition=Ready nodes --all --timeout=180s
 #    : $((secs--))
 # done
 sleep 10
+set +e
 kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+set -e
 
 echo -e "${COLOR_GREEN}[ INFO ] Restart all containers ${COLOR_OFF}"
 kubectl get pods --all-namespaces -o custom-columns=NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTNETWORK:.spec.hostNetwork --no-headers=true | grep '<none>' | awk '{print "-n "$1" "$2}' | xargs -L 1 -r kubectl delete pod --grace-period=15
