@@ -1007,6 +1007,30 @@ do
 						RUN_TEST_IDLE_SAME_NODE="true"
 						RUN_TEST_IDLE_DIFFERENT_NODE="true"
 						;;
+					tcp)
+						RUN_TEST_P2P_SAME_NODE_TCP="true"
+						RUN_TEST_P2P_SAME_NODE_UDP="false"
+						RUN_TEST_P2S_SAME_NODE_TCP="true"
+						RUN_TEST_P2S_SAME_NODE_UDP="false"
+						RUN_TEST_P2P_DIFFERENT_NODE_TCP="true"
+						RUN_TEST_P2P_DIFFERENT_NODE_UDP="false"
+						RUN_TEST_P2S_DIFFERENT_NODE_TCP="true"
+						RUN_TEST_P2S_DIFFERENT_NODE_UDP="false"
+						RUN_TEST_IDLE_SAME_NODE="true"
+						RUN_TEST_IDLE_DIFFERENT_NODE="true"
+						;;
+					udp)
+						RUN_TEST_P2P_SAME_NODE_TCP="false"
+						RUN_TEST_P2P_SAME_NODE_UDP="true"
+						RUN_TEST_P2S_SAME_NODE_TCP="false"
+						RUN_TEST_P2S_SAME_NODE_UDP="true"
+						RUN_TEST_P2P_DIFFERENT_NODE_TCP="false"
+						RUN_TEST_P2P_DIFFERENT_NODE_UDP="true"
+						RUN_TEST_P2S_DIFFERENT_NODE_TCP="false"
+						RUN_TEST_P2S_DIFFERENT_NODE_UDP="true"
+						RUN_TEST_IDLE_SAME_NODE="true"
+						RUN_TEST_IDLE_DIFFERENT_NODE="true"
+						;;
 					p2p1node)
 						RUN_TEST_P2P_SAME_NODE_TCP="true"
 						RUN_TEST_P2P_SAME_NODE_UDP="true"
