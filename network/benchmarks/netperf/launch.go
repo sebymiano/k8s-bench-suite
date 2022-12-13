@@ -29,6 +29,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -466,6 +467,14 @@ func processCsvData(csvData *string) bool {
 	return true
 }
 
+func PrettyString(str string) (string, error) {
+	var prettyJSON bytes.Buffer
+	if err := json.Indent(&prettyJSON, []byte(str), "", "    "); err != nil {
+		return "", err
+	}
+	return prettyJSON.String(), nil
+}
+
 func processJsonData(jsonData *string) bool {
 	t := time.Now().UTC()
 	outputFileDirectory := fmt.Sprintf("results_%s-%s", testNamespace, tag)
@@ -484,11 +493,19 @@ func processJsonData(jsonData *string) bool {
 		fmt.Println("ERROR writing output JSON datafile", err)
 		return false
 	}
-	_, err = fd.WriteString(*jsonData)
+
+	res, err := PrettyString(*jsonData)
+	if err != nil {
+		fmt.Println("Error formatting string", err)
+		return false
+	}
+
+	_, err = fd.WriteString(res)
 	if err != nil {
 		fmt.Println("Error writing string", err)
 		return false
 	}
+
 	fd.Close()
 	return true
 }
