@@ -560,7 +560,8 @@ func (t *NetPerfRPC) ReceiveOutput(data *WorkerOutput, reply *int) error {
 			"from", testcase.SourceNode, "to", testcase.DestinationNode, "MSS:", mss) + data.Output
 		writeOutputFile(outputCaptureFile, outputLog)
 		bw = parseIperfUDPBandwidth(data.Output)
-		registerDataPoint(testcase.Label, mss, bw, currentJobIndex, "na", "na")
+		cpuSender, cpuReceiver = parseIperfCPUUsage(data.Output)
+		registerDataPoint(testcase.Label, mss, bw, currentJobIndex, cpuSender, cpuReceiver)
 
 	case netperfTest:
 		outputLog = outputLog + fmt.Sprintln("Received netperf output from worker", data.Worker, "for test", testcase.Label,
