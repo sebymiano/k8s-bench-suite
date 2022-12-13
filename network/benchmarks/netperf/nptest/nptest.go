@@ -773,7 +773,7 @@ func iperfClient(serverHost, serverPort string, mss int, workItemType int) (rv s
 		}
 
 	case workItemType == iperfUDPTest:
-		output, success := cmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-i", "30", "-t", "10", "-f", "m", "-b", "0", "-u"}, 15)
+		output, success := cmdExec(iperf3Path, []string{iperf3Path, "-c", serverHost, "-i", "30", "-t", "10", "-f", "m", "-b", "0", "-u", "-Z"}, 15)
 		if success {
 			rv = output
 		}
