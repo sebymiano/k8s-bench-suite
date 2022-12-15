@@ -31,7 +31,17 @@ echo -e "${COLOR_GREEN}[ INFO ] Now it is time to deploy the services ${COLOR_OF
 kubectl apply -f manifests
 
 
-kubectl wait pods -n default --for condition=Ready --timeout=360s
+kubectl wait pods -l app=frontend --for condition=Ready --timeout=360s
+kubectl wait pods -l app=adservice --for condition=Ready --timeout=360s
+kubectl wait pods -l app=cartservice --for condition=Ready --timeout=360s
+kubectl wait pods -l app=checkoutservice --for condition=Ready --timeout=360s
+kubectl wait pods -l app=currencyservice --for condition=Ready --timeout=360s
+kubectl wait pods -l app=emailservice --for condition=Ready --timeout=360s
+kubectl wait pods -l app=paymentservice --for condition=Ready --timeout=360s
+kubectl wait pods -l app=productcatalogservice --for condition=Ready --timeout=360s
+kubectl wait pods -l app=recommendationservice --for condition=Ready --timeout=360s
+kubectl wait pods -l app=shippingservice --for condition=Ready --timeout=360s
+
 
 service_ip=$(kubectl get po -l app=frontend -o wide | awk '{if (NR!=1) {print $6}}')
 
