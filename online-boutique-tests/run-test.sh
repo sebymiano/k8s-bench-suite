@@ -7,6 +7,8 @@ COLOR_OFF='\033[0m' # No Color
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+TYPE=$1
+
 function cleanup {
     set +e
     kubectl taint nodes --all node-role.kubernetes.io/control-plane-
@@ -38,8 +40,17 @@ function label_nodes {
     done
 }
 
-trap cleanup EXIT
+if [ -z "$TYPE" ]; then
+    echo "Usage: $0 <TYPE of TEST <5k | 25k>"
+    exit 1
+fi
 
+if [ "$TYPE" != "5k" ] || [ "$TYPE" != "25k" ]; then
+    echo "Unsupported value: $TYPE (5k or 25k)"
+    exit 1
+fi
+
+trap cleanup EXIT
 add_node_taint
 label_nodes
 
@@ -66,7 +77,7 @@ echo -e "${COLOR_GREEN}[ INFO ] Got Service IP for Frontend Service: ${service_i
 sleep 10
 
 echo -e "${COLOR_GREEN}[ INFO ] Let's start the locust generator ${COLOR_OFF}"
-${DIR}/run_load_generators.sh $service_ip 8080 > /dev/null 2>&1
+${DIR}/run_load_generators.sh $service_ip 8080 $TYPE > /dev/null 2>&1
 
 sleep 30
 tmp_locust_pids=$(pgrep locust)

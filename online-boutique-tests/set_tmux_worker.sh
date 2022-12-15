@@ -2,6 +2,7 @@
 
 IP=$1
 PORT=$2
+TYPE=$3
 
 tmux set remain-on-exit on
 
@@ -37,7 +38,11 @@ done
 ######
 echo "Run the locust master in tmux pane 1..."
 echo "Run locust master"
-tmux send-keys -t 1 "locust -u 5000 -r 200 -t 3m --csv kn --csv-full-history -f locustfile.py --headless  -H http://${IP}:${PORT} --master --expect-workers=16" Enter
+if [ $TYPE == "25k" ]; then
+    tmux send-keys -t 1 "locust -u 25000 -r 500 -t 3m --csv kn --csv-full-history -f locustfile.py --headless  -H http://${IP}:${PORT} --master --expect-workers=16" Enter
+else
+    tmux send-keys -t 1 "locust -u 5000 -r 200 -t 3m --csv kn --csv-full-history -f locustfile.py --headless  -H http://${IP}:${PORT} --master --expect-workers=16" Enter
+fi
 
 sleep 0.1
 
