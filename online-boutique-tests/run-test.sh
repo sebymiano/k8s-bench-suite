@@ -15,17 +15,33 @@ function cleanup {
     sudo rm -rf locust_worker_*
 }
 
+function add_node_taint {
+    tmp_nodes=$(kubectl get nodes -o wide | grep 'control-plane' | awk '{print $1}')
+
+    nodes_str="${tmp_nodes//$'\n'/ }"
+    read -a nodes <<< "$nodes_str"
+
+    echo -e "${COLOR_YELLOW}[ INFO ] I will add a taint on the control plane node ${COLOR_OFF}"
+    for node in "${nodes[@]}"; do
+        kubectl taint nodes ${node} node-role.kubernetes.io/control-plane=:NoSchedule
+    done
+}
+
+function label_nodes {
+    tmp_nodes=$(kubectl get nodes -o wide | grep -v 'control-plane' | awk '{if (NR!=1) {print $1}}')
+
+    nodes_str="${tmp_nodes//$'\n'/ }"
+    read -a nodes <<< "$nodes_str"
+
+    for node in "${nodes[@]}"; do
+        kubectl label node ${node} node-role.kubernetes.io/worker=worker
+    done
+}
+
 trap cleanup EXIT
 
-tmp_nodes=$(kubectl get nodes -o wide | grep 'control-plane' | awk '{print $1}')
-
-nodes_str="${tmp_nodes//$'\n'/ }"
-read -a nodes <<< "$nodes_str"
-
-echo -e "${COLOR_YELLOW}[ INFO ] I will add a taint on the control plane node ${COLOR_OFF}"
-for node in "${nodes[@]}"; do
-    kubectl taint nodes ${node} node-role.kubernetes.io/control-plane=:NoSchedule
-done
+add_node_taint
+label_nodes
 
 echo -e "${COLOR_GREEN}[ INFO ] Now it is time to deploy the services ${COLOR_OFF}"
 kubectl apply -f manifests
