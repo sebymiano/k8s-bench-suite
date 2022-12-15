@@ -31,7 +31,7 @@ echo -e "${COLOR_GREEN}[ INFO ] Now it is time to deploy the services ${COLOR_OF
 kubectl apply -f manifests
 
 
-kubectl wait pods -l app=frontend --for condition=Ready --timeout=360s
+kubectl wait pods -n default --for condition=Ready --timeout=360s
 
 service_ip=$(kubectl get po -l app=frontend -o wide | awk '{if (NR!=1) {print $6}}')
 
@@ -40,11 +40,12 @@ echo -e "${COLOR_GREEN}[ INFO ] Got Service IP for Frontend Service: ${service_i
 sleep 10
 
 echo -e "${COLOR_GREEN}[ INFO ] Let's start the locust generator ${COLOR_OFF}"
-${DIR}/run_load_generators.sh $service_ip 8080
+${DIR}/run_load_generators.sh $service_ip 8080 > /dev/null 2>&1
 
-sleep 20
+sleep 30
 tmp_locust_pids=$(pgrep locust)
 
+echo -e "${COLOR_GREEN}[ INFO ] List of Locust PIDs ${COLOR_OFF}"
 echo $tmp_locust_pids
 
 locust_pids_str="${tmp_locust_pids//$'\n'/ }"
@@ -54,7 +55,7 @@ echo -e "${COLOR_GREEN}[ INFO ] Wait until the test finishes ${COLOR_OFF}"
 # wait for all pids
 for pid in "${locust_pids[@]}"; do
     while [ -e /proc/$pid ]; do
-        echo "Process: $pid is still running"
+        echo -e "${COLOR_GREEN}[ INFO ] Process: $pid is still running ${COLOR_OFF}"
         sleep 5
     done
 done
