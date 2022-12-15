@@ -17,7 +17,7 @@ function cleanup {
 
 trap cleanup EXIT
 
-tmp_nodes=$(kubectl get nodes -o wide | grep 'control-plane' | awk '{if (NR!=1) {print $1}}')
+tmp_nodes=$(kubectl get nodes -o wide | grep 'control-plane' | awk '{print $1}')
 
 nodes_str="${tmp_nodes//$'\n'/ }"
 read -a nodes <<< "$nodes_str"
