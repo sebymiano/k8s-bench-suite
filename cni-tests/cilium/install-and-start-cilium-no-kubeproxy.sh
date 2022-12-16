@@ -41,7 +41,7 @@ kubectl wait --for=condition=Ready nodes --all --timeout=180s
 
 sleep 10
 set +e
-kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+kubectl taint nodes --all node-role.kubernetes.io/control-plane- > /dev/null 2>&1
 set -e
 
 echo -e "${COLOR_GREEN}[ INFO ] Restart all containers ${COLOR_OFF}"
