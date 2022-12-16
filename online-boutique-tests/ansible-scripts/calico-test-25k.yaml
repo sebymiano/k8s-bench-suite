@@ -249,4 +249,4 @@
   tasks:
     - name: Unconditionally reboot the machine with all defaults (Wait for 5 min)
       reboot:
-        reboot_timeout: 300
+        reboot_timeout: 600
