@@ -152,16 +152,21 @@
       ansible.builtin.pause:
         seconds: 30
 
+    - name: Install locust
+      shell: "./install-locust.sh"
+      args:
+        chdir: /local/k8s-bench-suite/online-boutique-tests/
+
     - name: Start online boutique test
       shell: "./run-test.sh 25k >> run_online_boutique_25k.txt"
       args:
         chdir: /local/k8s-bench-suite/online-boutique-tests/
         creates: run_online_boutique_25k.txt
 
-    - name: Ensures {{playbook_dir}}/online-boutique-results/polykube-25k dir exists
+    - name: Ensures {{playbook_dir}}/online-boutique-results/morpheus-full-25k dir exists
       local_action:
         module: file
-        path: "{{ playbook_dir }}/online-boutique-results/polykube-25k"
+        path: "{{ playbook_dir }}/online-boutique-results/morpheus-full-25k"
         recurse: yes
         state: directory
 

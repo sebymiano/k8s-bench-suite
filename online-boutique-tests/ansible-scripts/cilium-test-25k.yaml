@@ -131,6 +131,18 @@
       args:
         chdir: /local/k8s-bench-suite/cni-tests/cilium/
         creates: init_cilium_cni.txt
+      failed_when: false
+      register: init_cni_status
+      changed_when: false
+
+    - name: Init when script fails
+      shell: rm -f /local/k8s-bench-suite/cni-tests/calico-bpf/init_cilium_cni.txt
+      when: init_cni_status.rc != 0
+
+    - name: Install locust
+      shell: "./install-locust.sh"
+      args:
+        chdir: /local/k8s-bench-suite/online-boutique-tests/
 
     - name: Start online boutique test
       shell: "./run-test.sh 25k >> run_online_boutique_25k.txt"
@@ -138,10 +150,10 @@
         chdir: /local/k8s-bench-suite/online-boutique-tests/
         creates: run_online_boutique_25k.txt
 
-    - name: Ensures {{playbook_dir}}/online-boutique-results/polykube-25k dir exists
+    - name: Ensures {{playbook_dir}}/online-boutique-results/cilium-25k dir exists
       local_action:
         module: file
-        path: "{{ playbook_dir }}/online-boutique-results/polykube-25k"
+        path: "{{ playbook_dir }}/online-boutique-results/cilium-25k"
         recurse: yes
         state: directory
 

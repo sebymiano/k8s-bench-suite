@@ -1,5 +1,6 @@
 #!/bin/bash
 
+set -e
 ansible-playbook -i hosts cilium-test-25k.yaml
 sleep 10
 
