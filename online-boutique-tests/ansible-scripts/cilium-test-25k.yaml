@@ -138,21 +138,24 @@
         chdir: /local/k8s-bench-suite/online-boutique-tests/
         creates: run_online_boutique_25k.txt
 
-    - name: Ensures {{playbook_dir}}/online-boutique-results/cilium-25k dir exists
-      file: >
-        path={{playbook_dir}}/online-boutique-results/cilium-25k
-        recurse=yes
-        state=directory
+    - name: Ensures {{playbook_dir}}/online-boutique-results/polykube-25k dir exists
+      local_action:
+        module: file
+        path: "{{ playbook_dir }}/online-boutique-results/polykube-25k"
+        recurse: yes
+        state: directory
 
     - name: Copy RPS results from test
       fetch:
         src: /local/k8s-bench-suite/online-boutique-tests/rps_stats_grpc.csv
         dest: "{{playbook_dir}}/online-boutique-results/cilium-25k/"
+        flat: yes
 
     - name: Copy Latency results from test
       fetch:
         src: /local/k8s-bench-suite/online-boutique-tests/latency_of_each_req_stats_grpc.csv
         dest: "{{playbook_dir}}/online-boutique-results/cilium-25k/"
+        flat: yes
 
     - name: Delete RPS results from test
       file:
