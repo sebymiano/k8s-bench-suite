@@ -65,7 +65,7 @@ kubectl create -f ${DIR}/custom-resources.yaml
 
 sleep 10
 set +e
-kubectl taint nodes --all node-role.kubernetes.io/control-plane-
+kubectl taint nodes --all node-role.kubernetes.io/control-plane- > /dev/null 2>&1
 set -e
 
 echo -e "${COLOR_GREEN}[ INFO ] Calico CNI installed. Wait until all services boot up ${COLOR_OFF}"
