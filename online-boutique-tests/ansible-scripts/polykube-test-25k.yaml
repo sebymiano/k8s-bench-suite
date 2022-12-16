@@ -1,0 +1,250 @@
+- hosts: master
+  become: yes
+  tasks:
+    - name: remove swap
+      shell: "swapoff -a"
+
+    - name: initialize the cluster
+      shell: "kubeadm init --pod-network-cidr=192.168.0.0/16 --apiserver-advertise-address={{ master_ip | default('10.10.10.1') }} --skip-phases=addon/kube-proxy >> cluster_initialized.txt"
+      args:
+        chdir: $HOME
+        creates: cluster_initialized.txt
+
+    - name: create .kube directory
+      become: yes
+      become_user: smiano
+      file:
+        path: $HOME/.kube
+        state: directory
+        mode: 0755
+      
+    - name: get user home directory
+      shell: >
+             getent passwd smiano | awk -F: '{ print $6 }'
+      changed_when: false
+      register: user_home
+
+    - name: debug output
+      debug:
+        var: user_home.stdout
+
+    - name: copy admin.conf to user's kube config
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: "{{ user_home.stdout }}/.kube/config"
+        remote_src: yes
+        owner: smiano
+
+- hosts: master
+  become: yes
+  gather_facts: false
+  tasks:
+    - name: get join command
+      shell: kubeadm token create --print-join-command
+      register: join_command_raw
+
+    - name: set join command
+      set_fact:
+        join_command: "{{ join_command_raw.stdout_lines[0] }}"
+
+- hosts: workers
+  become: yes
+  tasks:
+    - name: remove swap
+      shell: "swapoff -a"
+
+    - name: join cluster	
+      shell: "{{ hostvars['master'].join_command }} >> node_joined.txt"
+      args:
+        chdir: $HOME
+        creates: node_joined.txt
+
+- hosts: master
+  become: yes
+  tasks:
+    - name: add node label
+      shell: "/local/label-worker-nodes.sh >> label_worker_nodes.txt"
+      args:
+        chdir: $HOME
+        creates: label_worker_nodes.txt
+
+- hosts: all
+  become: yes
+  tasks:
+    - name: use local ips
+      shell: "{{ local_ip_path | default('/local/') }}use-local-ips.sh 10.10.10.2 >> node_local_ip.txt"
+      args:
+        chdir: $HOME
+        creates: node_local_ip.txt
+
+- hosts: all
+  become: yes
+  tasks:
+    - name: Disable HT
+      shell: "{{ disable_ht | default('/local/') }}disable_ht.sh >> disable_ht.txt"
+      args:
+        chdir: $HOME
+        creates: disable_ht.txt
+
+- hosts: all
+  gather_facts: false
+  become: true
+  vars:
+    sysctl_config:
+      # allow testing with buffers up to 1024MB
+      net.core.rmem_max: 1073741824 
+      net.core.wmem_max: 1073741824 
+      # increase Linux autotuning TCP buffer limit to 64MB
+      net.ipv4.tcp_rmem: 4096 87380 67108864
+      net.ipv4.tcp_wmem: 4096 65536 67108864
+      # recommended default congestion control is htcp 
+      net.ipv4.tcp_congestion_control: htcp
+      # recommended for hosts with jumbo frames enabled
+      net.ipv4.tcp_mtu_probing: 1
+      # recommended to enable 'fair queueing'
+      net.core.default_qdisc: fq
+
+  tasks:
+   - name: Change sysctl-settings
+     sysctl:
+       name: '{{ item.key }}'
+       value: '{{ item.value }}'
+       sysctl_set: yes
+       state: present
+       reload: yes
+       ignoreerrors: yes
+     with_dict: '{{ sysctl_config }}'
+
+- hosts: master
+  become_user: smiano
+  tasks:
+    - name: Initialize Polykube-CNI
+      shell: "./start-polykube-k8s.sh >> init_polykube_cni.txt"
+      args:
+        chdir: /local/k8s-bench-suite/cni-tests/polykube/
+        creates: init_polykube_cni.txt
+
+    - name: Start online boutique test
+      shell: "./run-test.sh 25k >> run_online_boutique_25k.txt"
+      args:
+        chdir: /local/k8s-bench-suite/online-boutique-tests/
+        creates: run_online_boutique_25k.txt
+
+    - name: Ensures {{playbook_dir}}/online-boutique-results/polykube-25k dir exists
+      file: >
+            path={{playbook_dir}}/online-boutique-results/polykube-25k
+            recurse=yes
+            state=directory
+
+    - name: Copy RPS results from test
+      fetch:
+        src: /local/k8s-bench-suite/online-boutique-tests/rps_stats_grpc.csv
+        dest: "{{playbook_dir}}/online-boutique-results/polykube-25k/"
+
+    - name: Copy Latency results from test
+      fetch:
+        src: /local/k8s-bench-suite/online-boutique-tests/latency_of_each_req_stats_grpc.csv
+        dest: "{{playbook_dir}}/online-boutique-results/polykube-25k/"
+
+    - name: Delete RPS results from test
+      file:
+        path: /local/k8s-bench-suite/online-boutique-tests/rps_stats_grpc.csv
+        state: absent
+
+    - name: Delete Latency results from test
+      file:
+        path: /local/k8s-bench-suite/online-boutique-tests/latency_of_each_req_stats_grpc.csv
+        state: absent
+
+    - name: Destroy all pods from online-boutique
+      shell: "kubectl delete -f manifests"
+      args:
+        chdir: /local/k8s-bench-suite/online-boutique-tests/
+
+    - name: Pause for 1 minute to wait until pods are removed
+      ansible.builtin.pause:
+        minutes: 1
+
+    - name: Destroy all pods from Polykube-CNI
+      shell: "kubectl delete -f manifests"
+      args:
+        chdir: /local/polykube/
+
+    - name: Pause for 2 minute to wait until pods are removed
+      ansible.builtin.pause:
+        minutes: 2
+
+# Cleanup all files and reset cluster
+- hosts: all
+  become: yes
+  tasks:
+    - name: Run kubeadm reset
+      shell: kubeadm reset -f
+
+    - name: get user home directory
+      shell: >
+             getent passwd smiano | awk -F: '{ print $6 }'
+      changed_when: false
+      register: user_home
+
+    - name: debug output
+      debug:
+        var: user_home.stdout
+
+    - name: Cleanup home
+      ansible.builtin.file:
+        path: "{{ user_home.stdout }}/.kube"
+        state: "absent"
+
+    - name: Reset CNI config
+      ansible.builtin.file:
+        path: "/etc/cni/net.d"
+        state: "absent"
+
+    - name: Clean up node_local_ip
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/node_local_ip.txt"
+        state: "absent"
+
+    - name: Clean up disable_ht
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/disable_ht.txt"
+        state: "absent"
+    
+- hosts: master
+  become: yes
+  tasks:
+    - name: Clean up cluster initialized
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/cluster_initialized.txt"
+        state: "absent"
+
+    - name: Cleanup Polykube-CNI file
+      ansible.builtin.file:
+        path: "/local/k8s-bench-suite/cni-tests/polykube/init_polykube_cni.txt"
+        state: "absent"
+    
+    - name: Cleanup online boutique test file
+      ansible.builtin.file:
+        path: "/local/k8s-bench-suite/online-boutique-tests/run_online_boutique_25k.txt"
+        state: "absent"
+
+- hosts: workers
+  become: yes
+  tasks:
+    - name: Clean up node_joined
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/node_joined.txt"
+        state: "absent"
+        
+    - name: Clean up label_worker_nodes
+      ansible.builtin.file:
+        path: "{{ ansible_env.HOME }}/label_worker_nodes.txt"
+        state: "absent"
+
+- hosts: all
+  become: yes
+  tasks:
+    - name: Unconditionally reboot the machine with all defaults (Wait for 5 min)
+      reboot:
+        reboot_timeout: 300
