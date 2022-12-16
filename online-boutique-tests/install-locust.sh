@@ -5,10 +5,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 sudo apt update && sudo apt install -y python3-pip
 
 # Install dependencies
-sudo python3 -m pip install -r ${DIR}/load-generator/requirements.txt --user
+pip3 install -r ${DIR}/load-generator/requirements.txt --user
 
 # Install Locust
-sudo python3 -m pip install locust --user
+pip3 install locust --user
 
 if [[ ":$PATH:" == *":$HOME/.local/bin:"* ]]; then
     echo "The path is correctly set"
