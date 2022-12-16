@@ -127,7 +127,7 @@
   become_user: smiano
   tasks:
     - name: Initialize Calico-CNI
-      shell: "echo 'N Y' | ./install-and-start-calico.sh >> init_calico_cni.txt"
+      shell: "printf 'n\ny\n' | ./install-and-start-calico.sh >> init_calico_cni.txt"
       args:
         chdir: /local/k8s-bench-suite/cni-tests/calico-bpf/
         creates: init_calico_cni.txt

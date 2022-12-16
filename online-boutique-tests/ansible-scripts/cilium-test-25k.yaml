@@ -127,7 +127,7 @@
   become_user: smiano
   tasks:
     - name: Initialize Cilium-CNI
-      shell: "echo 'Y N' | ./install-and-start-cilium-no-kubeproxy.sh >> init_cilium_cni.txt"
+      shell: "printf 'y\nn\n' | ./install-and-start-cilium-no-kubeproxy.sh >> init_cilium_cni.txt"
       args:
         chdir: /local/k8s-bench-suite/cni-tests/cilium/
         creates: init_cilium_cni.txt
