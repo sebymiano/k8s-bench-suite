@@ -17,10 +17,10 @@
         path: $HOME/.kube
         state: directory
         mode: 0755
-      
+
     - name: get user home directory
       shell: >
-             getent passwd smiano | awk -F: '{ print $6 }'
+        getent passwd smiano | awk -F: '{ print $6 }'
       changed_when: false
       register: user_home
 
@@ -34,6 +34,7 @@
         dest: "{{ user_home.stdout }}/.kube/config"
         remote_src: yes
         owner: smiano
+        mode: "0600"
 
 - hosts: master
   become: yes
@@ -53,7 +54,7 @@
     - name: remove swap
       shell: "swapoff -a"
 
-    - name: join cluster	
+    - name: join cluster
       shell: "{{ hostvars['master'].join_command }} >> node_joined.txt"
       args:
         chdir: $HOME
@@ -68,7 +69,13 @@
         chdir: $HOME
         creates: label_worker_nodes.txt
 
-- hosts: all
+    - name: use local ips
+      shell: "{{ local_ip_path | default('/local/') }}use-local-ips.sh 10.10.10.1 >> node_local_ip.txt"
+      args:
+        chdir: $HOME
+        creates: node_local_ip.txt
+
+- hosts: workers
   become: yes
   tasks:
     - name: use local ips
@@ -92,12 +99,12 @@
   vars:
     sysctl_config:
       # allow testing with buffers up to 1024MB
-      net.core.rmem_max: 1073741824 
-      net.core.wmem_max: 1073741824 
+      net.core.rmem_max: 1073741824
+      net.core.wmem_max: 1073741824
       # increase Linux autotuning TCP buffer limit to 64MB
       net.ipv4.tcp_rmem: 4096 87380 67108864
       net.ipv4.tcp_wmem: 4096 65536 67108864
-      # recommended default congestion control is htcp 
+      # recommended default congestion control is htcp
       net.ipv4.tcp_congestion_control: htcp
       # recommended for hosts with jumbo frames enabled
       net.ipv4.tcp_mtu_probing: 1
@@ -105,15 +112,15 @@
       net.core.default_qdisc: fq
 
   tasks:
-   - name: Change sysctl-settings
-     sysctl:
-       name: '{{ item.key }}'
-       value: '{{ item.value }}'
-       sysctl_set: yes
-       state: present
-       reload: yes
-       ignoreerrors: yes
-     with_dict: '{{ sysctl_config }}'
+    - name: Change sysctl-settings
+      sysctl:
+        name: "{{ item.key }}"
+        value: "{{ item.value }}"
+        sysctl_set: yes
+        state: present
+        reload: yes
+        ignoreerrors: yes
+      with_dict: "{{ sysctl_config }}"
 
 # Initialize the CNI
 - hosts: master
@@ -153,9 +160,9 @@
 
     - name: Ensures {{playbook_dir}}/online-boutique-results/morpheus-full-25k dir exists
       file: >
-            path={{playbook_dir}}/online-boutique-results/morpheus-full-25k
-            recurse=yes
-            state=directory
+        path={{playbook_dir}}/online-boutique-results/morpheus-full-25k
+        recurse=yes
+        state=directory
 
     - name: Copy RPS results from test
       fetch:
@@ -195,7 +202,7 @@
 
     - name: get user home directory
       shell: >
-             getent passwd smiano | awk -F: '{ print $6 }'
+        getent passwd smiano | awk -F: '{ print $6 }'
       changed_when: false
       register: user_home
 
@@ -222,7 +229,7 @@
       ansible.builtin.file:
         path: "{{ ansible_env.HOME }}/disable_ht.txt"
         state: "absent"
-    
+
 - hosts: master
   become: yes
   tasks:
@@ -235,7 +242,7 @@
       ansible.builtin.file:
         path: "/local/k8s-bench-suite/cni-tests/morpheus/init_morpheus_cni.txt"
         state: "absent"
-    
+
     - name: Cleanup online boutique test file
       ansible.builtin.file:
         path: "/local/k8s-bench-suite/online-boutique-tests/run_online_boutique_25k.txt"
@@ -248,7 +255,7 @@
       ansible.builtin.file:
         path: "{{ ansible_env.HOME }}/node_joined.txt"
         state: "absent"
-        
+
     - name: Clean up label_worker_nodes
       ansible.builtin.file:
         path: "{{ ansible_env.HOME }}/label_worker_nodes.txt"

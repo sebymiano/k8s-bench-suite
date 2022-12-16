@@ -45,7 +45,7 @@ if [ -z "$TYPE" ]; then
     exit 1
 fi
 
-if [ "$TYPE" != "5k" ] || [ "$TYPE" != "25k" ]; then
+if [ "$TYPE" != "5k" ] && [ "$TYPE" != "25k" ]; then
     echo "Unsupported value: $TYPE (5k or 25k)"
     exit 1
 fi
